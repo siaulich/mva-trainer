@@ -22,6 +22,7 @@ class TrainConfig:
     callbacks: Optional[Dict[str, any]] = field(default_factory=dict)
     validation_split: float = 0.1
     shuffle: bool = True
+    verbose: int = 1
 
 
 @dataclass
@@ -122,6 +123,8 @@ if __name__ == "__main__":
 
     even_trained_model.build_model(**(build_options))
 
+    even_trained_model.adapt_normalization_layers(X)
+
     even_trained_model.compile_model(
         optimizer=keras.optimizers.get(model_config.compile_options["optimizer"]),
         loss={
@@ -140,8 +143,6 @@ if __name__ == "__main__":
             "add_physics_informed_loss", False
         ),
     )
-
-    even_trained_model.adapt_normalization_layers(X)
 
     train_options = deepcopy(train_config.__dict__)
 

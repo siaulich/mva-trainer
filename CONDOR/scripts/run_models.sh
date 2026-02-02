@@ -18,8 +18,7 @@ arguments = python3 ../TrainScript.py \
     --load_config train_regression/load_config.yaml \
     --train_config train_regression/train_config.yaml \
     --model_config models/$(ModelName).yaml \
-    --event_numbers even \
-    --max_events 5000000
+    --event_numbers even 
 
 # Queue from file - reads each line and assigns to variables
-queue ModelName from scripts/model_names.txt
+queue ModelName from submit_params/model_names.txt

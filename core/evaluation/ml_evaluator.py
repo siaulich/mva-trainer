@@ -182,8 +182,9 @@ class MLEvaluator:
         self.reconstructors = (
             reconstructor if isinstance(reconstructor, list) else [reconstructor]
         )
-        self.X_test = X_test if isinstance(X_test, list) else [X_test]
-        self.y_test = y_test if isinstance(y_test, list) else [y_test]
+        self.X_test = X_test if isinstance(X_test, list) else [X_test] * len(self.reconstructors)
+        self.y_test = y_test if isinstance(y_test, list) else [y_test] * len(self.reconstructors)
+
 
         # Store configuration from first reconstructor (for backward compatibility)
         first_reconstructor = self.reconstructors[0]
@@ -206,7 +207,7 @@ class MLEvaluator:
             for idx, rec in enumerate(self.reconstructors)
         ]
 
-    def plot_training_history(self, save_path: Optional[str] = None):
+    def plot_training_history(self):
         """Plot training and validation loss/accuracy over epochs for all models."""
         for reconstructor in self.reconstructors:
             if reconstructor.history is None:
@@ -225,127 +226,52 @@ class MLEvaluator:
         )
 
         # Adjust subplot layout based on whether regression metrics exist
-        n_cols = 4 if has_regression else 2
-        fig, axes = plt.subplots(1, n_cols, figsize=(7 * n_cols, 5))
 
         color_map = plt.get_cmap("tab10")
 
-        # Plot loss for all models
-        for idx, reconstructor in enumerate(self.reconstructors):
-            history = reconstructor.history
-            if not reconstructor.perform_regression:
-                model_name = reconstructor.get_assignment_name()
-            else:
-                model_name = reconstructor.get_full_reco_name()
-
-            axes[0].plot(
-                history.history["loss"],
-                label=f"{model_name} (Train)",
-                linestyle="-",
-                color=color_map(idx),
-            )
-            axes[0].plot(
-                history.history["val_loss"],
-                label=f"{model_name} (Val)",
-                linestyle="--",
-                color=color_map(idx),
-            )
-
-        axes[0].set_title("Model Loss Comparison")
-        axes[0].set_xlabel("Epoch")
-        axes[0].set_ylabel("Loss")
-        axes[0].legend()
-        axes[0].grid(True, alpha=0.3)
-
-        # Plot accuracy for all models
-        for idx, reconstructor in enumerate(self.reconstructors):
-            history = reconstructor.history
-            if not reconstructor.perform_regression:
-                model_name = reconstructor.get_assignment_name()
-            else:
-                model_name = reconstructor.get_full_reco_name()
-            axes[1].plot(
-                history.history["accuracy"],
-                label=f"{model_name} (Train)",
-                linestyle="-",
-                color=color_map(idx),
-            )
-            axes[1].plot(
-                history.history["val_accuracy"],
-                label=f"{model_name} (Val)",
-                linestyle="--",
-                color=color_map(idx),
-            )
-
-        axes[1].set_title("Model Accuracy Comparison")
-        axes[1].set_xlabel("Epoch")
-        axes[1].set_ylabel("Assignment Accuracy")
-        axes[1].legend()
-        axes[1].grid(True, alpha=0.3)
-
-        # Plot regression loss if available
-        if has_regression:
-            for idx, reconstructor in enumerate(self.reconstructors):
+        unique_metrics = set()
+        for reconstructor in self.reconstructors:
+            unique_metrics.update([metric.replace("val_", "") for metric in reconstructor.history.history.keys() if metric.startswith("val_") ])
+        unique_metrics = list(unique_metrics)
+        num_metrics = len(unique_metrics)
+        num_cols = int(np.ceil(np.sqrt(num_metrics)))
+        num_rows = int(np.ceil(num_metrics / num_cols))
+        fig, axes = plt.subplots(num_rows, num_cols, figsize=(6 * num_cols, 4 * num_rows))
+        axes = axes.flatten()
+        for idx, metric_name in enumerate(unique_metrics):
+            ax = axes[idx]
+            for rec_idx, reconstructor in enumerate(self.reconstructors):
                 history = reconstructor.history
-                if "regression_loss" in history.history:
-                    if not reconstructor.perform_regression:
-                        model_name = reconstructor.get_assignment_name()
-                    else:
-                        model_name = reconstructor.get_full_reco_name()
-                    axes[2].plot(
-                        history.history["regression_loss"],
-                        label=f"{model_name} (Train)",
-                        linestyle="-",
-                        color=color_map(idx),
+                color = color_map(rec_idx)
+                label_prefix = (
+                    reconstructor.get_assignment_name()
+                    if not reconstructor.perform_regression
+                    else reconstructor.get_full_reco_name()
+                )
+                if metric_name in history.history:
+                    ax.plot(
+                        history.history[metric_name],
+                        label=f"{label_prefix} Training",
+                        color=color,
+                        linestyle='-'
                     )
-                    axes[2].plot(
-                        history.history["val_regression_loss"],
-                        label=f"{model_name} (Val)",
-                        linestyle="--",
-                        color=color_map(idx),
+                if f"val_{metric_name}" in history.history:
+                    ax.plot(
+                        history.history[f"val_{metric_name}"],
+                        label=f"{label_prefix} Validation",
+                        color=color,
+                        linestyle='--'
                     )
-
-            axes[2].set_title("Regression Loss Comparison")
-            axes[2].set_xlabel("Epoch")
-            axes[2].set_ylabel("Regression Loss")
-            axes[2].legend()
-            axes[2].grid(True, alpha=0.3)
-
-            # Plot regression deviation if available
-            for idx, reconstructor in enumerate(self.reconstructors):
-                history = reconstructor.history
-                if "regression_deviation" in history.history:
-                    if not reconstructor.perform_regression:
-                        model_name = reconstructor.get_assignment_name()
-                    else:
-                        model_name = reconstructor.get_full_reco_name()
-
-                    axes[3].plot(
-                        history.history["regression_deviation"],
-                        label=f"{model_name} (Train)",
-                        linestyle="-",
-                        color=color_map(idx),
-                    )
-                    axes[3].plot(
-                        history.history["val_regression_deviation"],
-                        label=f"{model_name} (Val)",
-                        linestyle="--",
-                        color=color_map(idx),
-                    )
-
-            axes[3].set_title("Relative Regression Deviation Comparison")
-            axes[3].set_xlabel("Epoch")
-            axes[3].set_ylabel("Relative Deviation")
-            axes[3].legend()
-            axes[3].grid(True, alpha=0.3)
-
+            ax.set_title(f"{metric_name.replace('_', ' ').title()} Over Epochs")
+            ax.set_xlabel("Epoch")
+            ax.set_ylabel(metric_name.replace('_', ' ').title())
+            ax.legend()
+            ax.grid(True, alpha=0.3)
+        # Remove any unused subplots
+        for j in range(idx + 1, len(axes)):
+            fig.delaxes(axes[j])
         fig.tight_layout()
-
-        if save_path:
-            fig.savefig(save_path, dpi=300, bbox_inches="tight")
-            print(f"Training history plot saved to {save_path}")
-
-        return fig, axes
+        return fig, ax
 
     @staticmethod
     def _plot_metric(ax, history, metric_name: str, title: str, ylabel: str):

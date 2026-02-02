@@ -95,7 +95,7 @@ class ResolutionCalculator:
         reco_values: np.ndarray,
         true_values: np.ndarray,
         use_relative_deviation: bool = True,
-        use_signed_deviation: bool = False,
+        use_signed_deviation: bool = True,
         deviation_function: Optional[Callable] = None
     ) -> np.ndarray:
         """
@@ -122,11 +122,11 @@ class ResolutionCalculator:
         elif use_relative_deviation:
             with np.errstate(divide='ignore', invalid='ignore'):
                 deviations = (reco_values - true_values) / true_values
-            if use_signed_deviation:
+            if not use_signed_deviation:
                 deviations = np.abs(deviations)
         else:
             deviations = reco_values - true_values
-            if use_signed_deviation:
+            if not use_signed_deviation:
                 deviations = np.abs(deviations)
 
 

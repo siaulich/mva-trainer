@@ -35,7 +35,7 @@ X_train, y_train = DataProcessor.get_data()
 
 del DataProcessor  # Free memory
 
-Transformer = keras_models.FeatureConcatFullReconstructor(data_config)
+Transformer = keras_models.FullRecoTransformer(data_config)
 
 
 Transformer.build_model(

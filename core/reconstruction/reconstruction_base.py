@@ -156,16 +156,7 @@ class KerasFFRecoBase(EventReconstructorBase, KerasMLWrapper):
                 },
                 **kwargs,
             )
-            denormalized_outputs = OutputUpScaleLayer(
-                name="regression"
-            )(regression_output)
-            self.model = KerasModelWrapper(
-                inputs=self.trainable_model.inputs,
-                outputs={
-                    "assignment": jet_assignment_probs,
-                    "regression": denormalized_outputs,
-                },
-            )
+            self.model = self.trainable_model
 
         else:
             if self.config.has_neutrino_truth and regression_output is None:
@@ -267,11 +258,11 @@ class KerasFFRecoBase(EventReconstructorBase, KerasMLWrapper):
             )
         if self.met_features is not None:
             predictions = self.model.predict_dict(
-                [data["jet_inputs"], data["lep_inputs"], data["met_inputs"]], verbose=0, batch_size=128
+                data, verbose=0, batch_size=128
             )["assignment"]
         else:
             predictions = self.model.predict_dict(
-                [data["jet_inputs"], data["lep_inputs"]], verbose=0, batch_size=128
+                data, verbose=0, batch_size=128
             )["assignment"]
         one_hot = self.generate_one_hot_encoding(predictions, exclusive)
         return one_hot

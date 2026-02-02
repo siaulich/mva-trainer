@@ -110,13 +110,15 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
                 raise ValueError(
                     "Regression layer not found in model. Cannot prepare regression targets."
                 )
-            stats = upscale_layer.get_stats()
-            regression_mean = stats["mean"]
-            regression_std = stats["std"]
+            if not isinstance(upscale_layer, keras.layers.Rescaling):
+                raise ValueError(
+                    "Regression layer is not a Rescaling layer. Cannot prepare regression targets."
+                )
+            regression_std = upscale_layer.scale
+            regression_mean = upscale_layer.offset 
             y_train["normalized_regression"] = (
                 regression_data - regression_mean
             ) / regression_std
-            print("Prepared regression targets with normalization.")
 
         if "reco_mass_deviation" in self.trainable_model.output_names:
             y_train["reco_mass_deviation"] = np.zeros(
@@ -126,6 +128,10 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
         return X_train, y_train, sample_weights
 
     def add_reco_mass_deviation_loss(self):
+        if self.model is None:
+            raise ValueError(
+                "Model has not been built yet. Call build_model() before adding physics-informed loss. If you use regression, adapt the normalization layers first."
+            )
         if "regression" not in self.model.output_names:
             raise ValueError(
                 "Regression output not found in model outputs. Cannot add physics-informed loss."
@@ -147,13 +153,13 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
         reco_mass_deviation = reco_mass_deviation_layer(
             neutrino_momenta, lepton_momenta
         )
-        model_outputs = self.model.outputs
         self.trainable_model = keras.Model(
             inputs=self.model.inputs,
-            outputs=
-            {"assignment": assignment_probs,
-             "normalized_regression": normalised_neutrino_output,
-             "reco_mass_deviation": reco_mass_deviation},
+            outputs={
+                "assignment": assignment_probs,
+                "normalized_regression": normalised_neutrino_output,
+                "reco_mass_deviation": reco_mass_deviation,
+            },
         )
 
         print("Added physics-informed loss to the model.")
@@ -279,7 +285,6 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
                 X_train,
                 y_train,
                 sample_weight=sample_weights,
-                class_weight=self.class_weights,
                 epochs=epochs,
                 batch_size=batch_size,
                 validation_split=validation_split,
@@ -291,7 +296,6 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
                 X_train,
                 y_train,
                 sample_weight=sample_weights,
-                class_weight=self.class_weights,
                 epochs=epochs,
                 batch_size=batch_size,
                 validation_split=validation_split,
@@ -438,16 +442,24 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
                 del submodel
                 print("Adapted normalization layer: ", layer.name)
 
-        if self.perform_regression and "regression" in self.model.output_names:
+        if self.perform_regression and "normalized_regression" in self.model.output_names:
             neutrino_truth_std = np.std(data["neutrino_truth"], axis=0)
-            regression_layer = self.model.get_layer("regression")
-            if hasattr(regression_layer, "set_stats"):
-                regression_layer.set_stats(std=neutrino_truth_std)
-                print("Set regression layer stats.")
-            else:
-                print(
-                    "WARNING: Regression layer has no set_stats method. Stats not set."
-                )
+            #neutrino_truth_mean = np.mean(data["neutrino_truth"], axis=0)
+            denormalisation_layer = keras.layers.Rescaling(
+                scale=neutrino_truth_std,
+                #offset=neutrino_truth_mean,
+                name="regression",
+            )
+            self.model = KerasModelWrapper(
+                inputs=self.model.inputs,
+                outputs={
+                    "assignment": self.model.get_layer("assignment").output,
+                    "regression": denormalisation_layer(
+                        self.model.get_layer("normalized_regression").output
+                    ),
+                },
+            )
+            print("Set regression denormalization layer with computed mean and std.")
 
     def export_to_onnx(self, onnx_file_path="model.onnx"):
         """
