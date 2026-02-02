@@ -707,9 +707,6 @@ class RootPreprocessor:
 
         total = b1_4 + b2_4 + l1_4 + l2_4
         return {"reco_mllbb": compute_mass_from_lorentz_vector_array(total)}
-    
-    def _compute_N_jets(self, jets):
-
         
 
     @staticmethod
