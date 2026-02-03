@@ -89,17 +89,18 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
         pass
 
     def prepare_training_data(
-        self, X_train, y_train, sample_weights=None, class_weights=None, copy_data=False
+        self, X_train, sample_weights=None, class_weights=None, copy_data=False
     ):
         self.sample_weights = sample_weights
         self.class_weights = class_weights
         if copy_data:
-            y_train = deepcopy(y_train)
             X_train = deepcopy(X_train)
 
+        y_train = {}
+
         # Rename targets to match model output names
-        y_train["assignment"] = y_train.pop("assignment")
-        y_train["regression"] = y_train.pop("regression")
+        y_train["assignment"] = X_train["assignment"]
+        y_train["regression"] = X_train["regression"]
         if not self.perform_regression:
             y_train.pop("regression")
 
@@ -257,7 +258,6 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
     def train_model(
         self,
         X_train,
-        y_train,
         epochs,
         batch_size,
         sample_weights=None,
@@ -272,7 +272,7 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
             )
 
         X_train, y_train, sample_weights = self.prepare_training_data(
-            X_train, y_train, sample_weights=sample_weights, copy_data=copy_data
+            X_train, sample_weights=sample_weights, copy_data=copy_data
         )
         if self.trainable_model is None:
             self.trainable_model = self.model

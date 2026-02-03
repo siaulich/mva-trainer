@@ -154,7 +154,6 @@ if __name__ == "__main__":
 
     even_history = even_trained_model.train_model(
         X,
-        y,
         **train_options,
     )
 
