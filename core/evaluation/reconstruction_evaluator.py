@@ -263,7 +263,7 @@ class ComplementarityAnalyzer:
                 continue
             predictions = self.prediction_manager.get_assignment_predictions(i)
             accuracy_data = AccuracyCalculator.compute_accuracy(
-                self.y_test["assignment_labels"],
+                self.y_test["assignment"],
                 predictions,
                 per_event=True,
             )
@@ -433,7 +433,7 @@ class ReconstructionEvaluator:
             reconstructor_index
         )
         return AccuracyCalculator.compute_accuracy(
-            self.y_test["assignment_labels"],
+            self.y_test["assignment"],
             predictions,
             per_event=per_event,
         )
@@ -448,7 +448,7 @@ class ReconstructionEvaluator:
             reconstructor_index
         )
         return SelectionAccuracyCalculator.compute_selection_accuracy(
-            self.y_test["assignment_labels"],
+            self.y_test["assignment"],
             predictions,
             per_event=per_event,
         )
@@ -564,7 +564,7 @@ class ReconstructionEvaluator:
         Returns:
             Deviation value(s)
         """
-        if self.y_test.get("neutrino_truth") is None:
+        if self.y_test.get("regression") is None:
             raise ValueError(
                 "No regression targets found in y_test. "
                 "Cannot evaluate neutrino deviation."
@@ -573,7 +573,7 @@ class ReconstructionEvaluator:
         predictions = self.prediction_manager.get_neutrino_predictions(
             reconstructor_index
         )
-        true_neutrinos = self.y_test["neutrino_truth"]
+        true_neutrinos = self.y_test["regression"]
 
         if deviation_type == "relative":
             return NeutrinoDeviationCalculator.compute_relative_deviation(
@@ -628,7 +628,7 @@ class ReconstructionEvaluator:
         Returns:
             Tuple of (figure, axis)
         """
-        if self.y_test.get("neutrino_truth") is None:
+        if self.y_test.get("regression") is None:
             raise ValueError(
                 "No regression targets found in y_test. "
                 "Cannot evaluate neutrino deviation."
@@ -873,7 +873,7 @@ class ReconstructionEvaluator:
         ]
 
         return ConfusionMatrixPlotter.plot_confusion_matrices(
-            self.y_test["assignment_labels"],
+            self.y_test["assignment"],
             predictions_list,
             names,
             normalize,
@@ -1647,7 +1647,7 @@ class ReconstructionEvaluator:
         :param bins: Number of bins
         :param xlims: Optional x-axis limits
         """
-        true_neutrino = self.y_test["neutrino_truth"]
+        true_neutrino = self.y_test["regression"]
         event_weights = FeatureExtractor.get_event_weights(self.X_test)
         neutrino_deviations = []
         names = []

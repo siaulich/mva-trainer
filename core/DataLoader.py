@@ -180,8 +180,8 @@ class DataPreprocessor:
         """
         X = {k: v for k, v in feature_data.items() if v is not None}
         y = {
-            "assignment_labels": X["assignment_labels"],
-            "neutrino_truth": X.get("neutrino_truth", None),
+            "assignment": X["assignment"],
+            "regression": X.get("regression", None),
         }
         return X, y
 
@@ -232,7 +232,7 @@ class DataPreprocessor:
         # Remove NaN events from NuFlows if present
         self._filter_nuflows_nans()
 
-        self.data_length = len(self.feature_data["assignment_labels"])
+        self.data_length = len(self.feature_data["assignment"])
 
         # Create DataConfig for downstream use
         self.data_config = self.load_config.to_data_config()
@@ -304,7 +304,7 @@ class DataPreprocessor:
                            self.load_config.antineutrino_momentum_features)
             data_length = len(loaded[combined_keys[0]])
             target_shape = (data_length, self.load_config.NUM_LEPTONS, -1)
-            self.feature_data["neutrino_truth"] = self._load_feature_array(
+            self.feature_data["regression"] = self._load_feature_array(
                 loaded, combined_keys, target_shape=target_shape
             )
 
@@ -348,11 +348,11 @@ class DataPreprocessor:
                 loaded[self.load_config.lepton_truth_label],
             ),
         )
-        assignment_labels, reco_mask = label_builder.build_labels()
+        assignment, reco_mask = label_builder.build_labels()
 
         # Apply reconstruction mask to all features
         self._apply_mask_to_features(reco_mask)
-        self.feature_data["assignment_labels"] = assignment_labels
+        self.feature_data["assignment"] = assignment
 
     def _filter_nuflows_nans(self) -> None:
         """Remove events with NaNs in NuFlows targets if present."""

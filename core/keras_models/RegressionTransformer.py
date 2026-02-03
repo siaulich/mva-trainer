@@ -14,11 +14,20 @@ from core.components import (
     ConcatLeptonCharge,
     ExpandJetMask,
     SplitTransformerOutput,
+    TransposeLayer,
 )
 
-class FeatureConcatFullReconstructor(KerasFFRecoBase):
-    def __init__(self, config, name="FeatureConcatTransformer",use_nu_flows=False, perform_regression=True):
-        super().__init__(config, name=name, perform_regression = False if use_nu_flows else perform_regression, use_nu_flows=use_nu_flows)
+
+class FullRecoTransformer(KerasFFRecoBase):
+    def __init__(
+        self, config, name="Transformer", use_nu_flows=False, perform_regression=True
+    ):
+        super().__init__(
+            config,
+            name=name,
+            perform_regression=False if use_nu_flows else perform_regression,
+            use_nu_flows=use_nu_flows,
+        )
 
     def build_model(
         self,
@@ -169,4 +178,136 @@ class FeatureConcatFullReconstructor(KerasFFRecoBase):
         self._build_model_base(
             assignment_logits,
             regression_outputs,
+        )
+
+
+class FeatureConcatTransformerReconstructor(KerasFFRecoBase):
+    def __init__(
+        self,
+        config,
+        name="FeatureConcatTransformer",
+        use_nu_flows=False,
+        perform_regression=True,
+    ):
+        super().__init__(
+            config,
+            name=name,
+            perform_regression=False if use_nu_flows else perform_regression,
+            use_nu_flows=use_nu_flows,
+        )
+
+    def build_model(
+        self,
+        hidden_dim,
+        num_layers,
+        dropout_rate,
+        num_heads=8,
+        compute_HLF=True,
+        use_global_event_features=False,
+        log_variables=False,
+    ):
+        """
+        Builds the Assignment Transformer model.
+        Args:
+            hidden_dim (int): The dimensionality of the hidden layers.
+            num_heads (int): The number of attention heads.
+            num_layers (int): The number of transformer layers.
+            dropout_rate (float): The dropout rate to be applied in the model.
+        Returns:
+            keras.Model: The constructed Keras model.
+        """
+        # Input layers
+        normed_inputs, masks = self._prepare_inputs(
+            compute_HLF=compute_HLF,
+            log_variables=log_variables,
+            use_global_event_features=use_global_event_features,
+        )
+        normed_jet_inputs = normed_inputs["jet_inputs"]
+        normed_lep_inputs = normed_inputs["lepton_inputs"]
+        normed_met_inputs = normed_inputs["met_inputs"]
+        jet_mask = masks["jet_mask"]
+
+        if compute_HLF:
+            normed_HLF_inputs = normed_inputs["hlf_inputs"]
+            flat_normed_HLF_inputs = keras.layers.Reshape((self.max_jets, -1))(
+                normed_HLF_inputs
+            )
+            normed_jet_inputs = keras.layers.Concatenate(axis=-1)(
+                [normed_jet_inputs, flat_normed_HLF_inputs]
+            )
+
+        if self.config.has_global_event_features:
+            normed_global_event_inputs = normed_inputs["global_event_inputs"]
+            flatted_global_event_inputs = keras.layers.Flatten()(
+                normed_global_event_inputs
+            )
+            # Add global event features to jets
+            global_event_repeated_jets = keras.layers.RepeatVector(self.max_jets)(
+                flatted_global_event_inputs
+            )
+            normed_jet_inputs = keras.layers.Concatenate(axis=-1)(
+                [normed_jet_inputs, global_event_repeated_jets]
+            )
+
+        flatted_met_inputs = keras.layers.Flatten()(normed_met_inputs)
+        flatted_lepton_inputs = keras.layers.Flatten()(normed_lep_inputs)
+
+        # Concat met and lepton features to each jet
+        met_repeated_jets = keras.layers.RepeatVector(self.max_jets)(flatted_met_inputs)
+        lepton_repeated_jets = keras.layers.RepeatVector(self.max_jets)(
+            flatted_lepton_inputs
+        )
+        jet_features = keras.layers.Concatenate(axis=-1)(
+            [normed_jet_inputs, met_repeated_jets, lepton_repeated_jets]
+        )
+
+        jet_embedding = MLP(
+            hidden_dim, num_layers=4, name="concat_vector_embedding_mlp"
+        )(jet_features)
+
+        x = jet_embedding
+        for i in range(num_layers):
+            x = SelfAttentionBlock(
+                num_heads=num_heads,
+                key_dim=hidden_dim,
+                dropout_rate=dropout_rate,
+                name=f"central_sfa_{i}",
+            )(x, jet_mask)
+
+        jets_transformed = x
+        # Output layers
+        jet_output_embedding = MLP(
+            self.NUM_LEPTONS,
+            num_layers=3,
+            activation=None,
+            name="jet_output_embedding",
+            dropout_rate=dropout_rate,
+        )(jets_transformed)
+
+        jet_assignment_probs = TemporalSoftmax(axis=1, name="assignment")(
+            jet_output_embedding, mask=jet_mask
+        )
+
+        neutrino_output_projection = MLP(
+            output_dim=hidden_dim, name="neutrino_output_projection"
+        )(jet_output_embedding)
+
+        neutrino_output_pooling = PoolingAttentionBlock(
+            key_dim=hidden_dim, num_seeds=self.NUM_LEPTONS, dropout_rate=dropout_rate
+        )(neutrino_output_projection)
+
+        x = neutrino_output_pooling
+        for i in range(num_layers):
+            x = SelfAttentionBlock(
+                num_heads=num_heads,
+                key_dim=hidden_dim,
+                dropout_rate=dropout_rate,
+                name=f"regression_sfa_{i}",
+            )(x)
+
+        regression_output = MLP(output_dim=3, name="normalized_regression")(x)
+
+        self._build_model_base(
+            jet_assignment_probs,
+            regression_output,
         )

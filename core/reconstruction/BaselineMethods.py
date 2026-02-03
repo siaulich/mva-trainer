@@ -258,7 +258,7 @@ class ChiSquareAssigner(BaselineAssigner):
         if self.use_nu_flows_for_assignment:
             return data_dict["nu_flows_neutrino_truth"]
         else:
-            return data_dict["neutrino_truth"]
+            return data_dict["regression"]
 
     def construct_neutrino_four_vectors(self, data_dict):
         neutrino_3_vector = self.get_neutrino_momenta(data_dict)

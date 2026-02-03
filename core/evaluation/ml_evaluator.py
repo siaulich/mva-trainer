@@ -57,7 +57,7 @@ class FeatureImportanceCalculator:
 
         assignment_baseline_performance = AccuracyCalculator.compute_accuracy(
             assignment_baseline_prediction,
-            self.y_test["assignment_labels"],
+            self.y_test["assignment"],
             per_event=False,
         )
         regression_baseline_prediction = None
@@ -145,7 +145,7 @@ class FeatureImportanceCalculator:
                 assignment_performance = -(
                     AccuracyCalculator.compute_accuracy(
                         permutated_assignment_pred,
-                        self.y_test["assignment_labels"],
+                        self.y_test["assignment"],
                         per_event=False,
                     )
                     - assignment_baseline_performance
@@ -701,7 +701,7 @@ class MLEvaluator:
             # Compute accuracy with bootstrap
             acc_mean, acc_lower, acc_upper = BootstrapCalculator.compute_bootstrap_ci(
                 data=AccuracyCalculator.compute_accuracy(
-                    true_labels=self.y_test[idx]["assignment_labels"],
+                    true_labels=self.y_test[idx]["assignment"],
                     predictions=assignment_pred,
                     per_event=True,
                 ),
@@ -711,7 +711,7 @@ class MLEvaluator:
             sel_acc_mean, sel_acc_lower, sel_acc_upper = (
                 BootstrapCalculator.compute_bootstrap_ci(
                     data=SelectionAccuracyCalculator.compute_selection_accuracy(
-                        true_labels=self.y_test[idx]["assignment_labels"],
+                        true_labels=self.y_test[idx]["assignment"],
                         predictions=assignment_pred,
                         per_event=True,
                     ),

@@ -55,8 +55,8 @@ class EventReconstructorBase(BaseUtilityModel, ABC):
             print(
                 "WARNING: use_nu_flows is True but 'nu_flows_neutrino_truth' not found in data_dict. Falling back to 'neutrino_truth'."
             )
-        if "neutrino_truth" in data_dict:
-            return data_dict["neutrino_truth"]
+        if "regression" in data_dict:
+            return data_dict["regression"]
         print(f"data_dict keys: {list(data_dict.keys())}")
         raise ValueError(
             "No regression targets found in data_dict for neutrino reconstruction."
@@ -114,8 +114,8 @@ class EventReconstructorBase(BaseUtilityModel, ABC):
                 data_dict, data_dict["assignment_truth"], per_event=False
             )
             results["accuracy"] = accuracy
-        if self.perform_regression and "neutrino_truth" in data_dict:
-            mse = self.evaluate_regression(data_dict, data_dict["neutrino_truth"])
+        if self.perform_regression and "regression" in data_dict:
+            mse = self.evaluate_regression(data_dict, data_dict["regression"])
             results["regression_mse"] = mse
         return results
 
@@ -353,14 +353,14 @@ class KerasFFRecoBase(EventReconstructorBase, KerasMLWrapper):
             data_dict
         )
         results = {}
-        if "assignment_labels" in data_dict:
+        if "assignment" in data_dict:
             accuracy = self.compute_accuracy(
-                assignment_predictions, data_dict["assignment_labels"], per_event=False
+                assignment_predictions, data_dict["assignment"], per_event=False
             )
             results["accuracy"] = accuracy
-        if self.perform_regression and "neutrino_truth" in data_dict:
+        if self.perform_regression and "regression" in data_dict:
             mse = self.compute_regression_mse(
-                regression_predictions, data_dict["neutrino_truth"]
+                regression_predictions, data_dict["regression"]
             )
             results["regression_mse"] = mse
         return results

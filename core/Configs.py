@@ -216,7 +216,7 @@ class DataConfig:
 
         # Truth features (conditional)
         if self.has_neutrino_truth:
-            self._add_feature_indices("neutrino_truth", self.neutrino_momentum_features)
+            self._add_feature_indices("regression", self.neutrino_momentum_features)
         if self.has_nu_flows_neutrino_truth:
             self._add_feature_indices(
                 "nu_flows_neutrino_truth", self.nu_flows_neutrino_momentum_features
@@ -251,7 +251,7 @@ class DataConfig:
             ),
             # Truth features (n_events, NUM_LEPTONS, n_features)
             (
-                "neutrino_truth",
+                "regression",
                 self.has_neutrino_truth,
                 self.neutrino_momentum_features,
                 (None, self.NUM_LEPTONS),

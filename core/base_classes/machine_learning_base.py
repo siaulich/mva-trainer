@@ -98,8 +98,8 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
             X_train = deepcopy(X_train)
 
         # Rename targets to match model output names
-        y_train["assignment"] = y_train.pop("assignment_labels")
-        y_train["regression"] = y_train.pop("neutrino_truth")
+        y_train["assignment"] = y_train.pop("assignment")
+        y_train["regression"] = y_train.pop("regression")
         if not self.perform_regression:
             y_train.pop("regression")
 
@@ -274,9 +274,6 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
         X_train, y_train, sample_weights = self.prepare_training_data(
             X_train, y_train, sample_weights=sample_weights, copy_data=copy_data
         )
-        if self.history is not None:
-            print("Warning: Overwriting existing training history.")
-
         if self.trainable_model is None:
             self.trainable_model = self.model
 
@@ -300,7 +297,6 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
                 batch_size=batch_size,
                 validation_split=validation_split,
                 callbacks=callbacks,
-                initial_epoch=len(self.history.epoch),
                 **kwargs,
             )
             # Append new history to existing history
@@ -443,8 +439,8 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
                 print("Adapted normalization layer: ", layer.name)
 
         if self.perform_regression and "normalized_regression" in self.model.output_names:
-            neutrino_truth_std = np.std(data["neutrino_truth"], axis=0)
-            #neutrino_truth_mean = np.mean(data["neutrino_truth"], axis=0)
+            neutrino_truth_std = np.std(data["regression"], axis=0)
+            #neutrino_truth_mean = np.mean(data["regression"], axis=0)
             denormalisation_layer = keras.layers.Rescaling(
                 scale=neutrino_truth_std,
                 #offset=neutrino_truth_mean,

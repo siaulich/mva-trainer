@@ -158,7 +158,7 @@ class DataPlotter:
         """
         jet_features = self.get_all_feature_data("jet_inputs")
         lepton_features = self.get_all_feature_data("lep_inputs")
-        labels = self.get_all_feature_data("assignment_labels")
+        labels = self.get_all_feature_data("assignment")
 
 
         lepton_extended = np.repeat(

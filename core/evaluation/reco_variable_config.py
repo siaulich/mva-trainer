@@ -105,8 +105,8 @@ reconstruction_variable_configs = {
             np.linalg.norm(n[:, 1, :], axis=-1)/1e3,
         ),
         "extract_func": lambda X: (
-            np.linalg.norm(X["neutrino_truth"][:, 0, :], axis=-1)/1e3,
-            np.linalg.norm(X["neutrino_truth"][:, 1, :], axis=-1)/1e3,
+            np.linalg.norm(X["regression"][:, 0, :], axis=-1)/1e3,
+            np.linalg.norm(X["regression"][:, 1, :], axis=-1)/1e3,
         ),
         "label": r"$|\vec{p}(\nu)|$ [GeV]",
         "combine_tops": True,
@@ -142,8 +142,8 @@ reconstruction_variable_configs = {
     "nu_px": {
         "compute_func": lambda l, j, n: (n[:, 0, 0]/1e3, n[:, 1, 0]/1e3),
         "extract_func": lambda X: (
-            X["neutrino_truth"][:, 0, 0]/1e3,
-            X["neutrino_truth"][:, 1, 0]/1e3,
+            X["regression"][:, 0, 0]/1e3,
+            X["regression"][:, 1, 0]/1e3,
         ),
         "label": r"$p_{x}(\nu)$ [GeV]",
         "combine_tops": True,
@@ -157,8 +157,8 @@ reconstruction_variable_configs = {
     "nu_py": {
         "compute_func": lambda l, j, n: (n[:, 0, 1]/1e3, n[:, 1, 1]/1e3),
         "extract_func": lambda X: (
-            X["neutrino_truth"][:, 0, 1]/1e3,
-            X["neutrino_truth"][:, 1, 1]/1e3,
+            X["regression"][:, 0, 1]/1e3,
+            X["regression"][:, 1, 1]/1e3,
         ),
         "label": r"$p_{y}(\nu)$ [GeV]",
         "combine_tops": True,
@@ -172,8 +172,8 @@ reconstruction_variable_configs = {
     "nu_pz": {
         "compute_func": lambda l, j, n: (n[:, 0, 2]/1e3, n[:, 1, 2]/1e3),
         "extract_func": lambda X: (
-            X["neutrino_truth"][:, 0, 2]/1e3,
-            X["neutrino_truth"][:, 1, 2]/1e3,
+            X["regression"][:, 0, 2]/1e3,
+            X["regression"][:, 1, 2]/1e3,
         ),
         "label": r"$p_{z}(\nu)$ [GeV]",
         "combine_tops": True,
@@ -292,12 +292,12 @@ reconstruction_variable_configs = {
         "extract_func": lambda X: (
             compute_mass_from_lorentz_vector_array(
                 make_4vect(X["lep_inputs"][:, 0, :4])
-                + make_nu_4vect(X["neutrino_truth"][:, 0, :])
+                + make_nu_4vect(X["regression"][:, 0, :])
             )
             / 1e3,
             compute_mass_from_lorentz_vector_array(
                 make_4vect(X["lep_inputs"][:, 1, :4])
-                + make_nu_4vect(X["neutrino_truth"][:, 1, :])
+                + make_nu_4vect(X["regression"][:, 1, :])
             )
             / 1e3,
         ),
@@ -318,12 +318,12 @@ reconstruction_variable_configs = {
         "extract_func": lambda X: (
             (
                 make_4vect(X["lep_inputs"][:, 0, :4])[..., 3]
-                + make_nu_4vect(X["neutrino_truth"][:, 0, :])[..., 3]
+                + make_nu_4vect(X["regression"][:, 0, :])[..., 3]
             )
             / 1e3,
             (
                 make_4vect(X["lep_inputs"][:, 1, :4])[..., 3]
-                + make_nu_4vect(X["neutrino_truth"][:, 1, :])[..., 3]
+                + make_nu_4vect(X["regression"][:, 1, :])[..., 3]
             )
             / 1e3,
         ),
@@ -343,9 +343,9 @@ reconstruction_variable_configs = {
         ),
         "extract_func": lambda X: (
                ( make_4vect(X["lep_inputs"][:, 0, :4])
-                + make_nu_4vect(X["neutrino_truth"][:, 0, :]))[...,:3],
+                + make_nu_4vect(X["regression"][:, 0, :]))[...,:3],
                 (make_4vect(X["lep_inputs"][:, 1, :4])
-                + make_nu_4vect(X["neutrino_truth"][:, 1, :]))[...,:3]
+                + make_nu_4vect(X["regression"][:, 1, :]))[...,:3]
         ),
         "label": r"$\Delta \phi(W_{\text{true}},W_{\text{reco}})$",
         "combine_tops": True,
@@ -368,10 +368,10 @@ reconstruction_variable_configs = {
         ),
         "extract_func": lambda X: (
             project_vectors_onto_axis(
-                X["neutrino_truth"][:, 0, :], make_4vect(X["lep_inputs"][:, 0, :4])[..., :3]
+                X["regression"][:, 0, :], make_4vect(X["lep_inputs"][:, 0, :4])[..., :3]
             )/1e3,
             project_vectors_onto_axis(
-                X["neutrino_truth"][:, 1, :], make_4vect(X["lep_inputs"][:, 1, :4])[..., :3]
+                X["regression"][:, 1, :], make_4vect(X["lep_inputs"][:, 1, :4])[..., :3]
             )/1e3,
         ),
         "label": r"$p_{\parallel}(\nu)$ [GeV]",
