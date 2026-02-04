@@ -145,11 +145,7 @@ class KerasFFRecoBase(EventReconstructorBase, KerasMLWrapper):
     def _build_model_base(self, jet_assignment_probs, regression_output=None, **kwargs):
         if self.config.has_neutrino_truth and regression_output is not None:
             self.trainable_model = KerasModelWrapper(
-                inputs=[
-                    self.inputs["jet_inputs"],
-                    self.inputs["lep_inputs"],
-                    self.inputs["met_inputs"],
-                ],
+                inputs=list(self.inputs.values()),
                 outputs={
                     "assignment": jet_assignment_probs,
                     "normalized_regression": regression_output,
@@ -169,11 +165,7 @@ class KerasFFRecoBase(EventReconstructorBase, KerasMLWrapper):
                 )
             print("Building model without regression output.")
             self.model = KerasModelWrapper(
-                inputs=[
-                    self.inputs["jet_inputs"],
-                    self.inputs["lep_inputs"],
-                    self.inputs["met_inputs"],
-                ],
+                inputs=list(self.inputs.values()),
                 outputs={"assignment": jet_assignment_probs},
                 **kwargs,
             )
@@ -258,11 +250,11 @@ class KerasFFRecoBase(EventReconstructorBase, KerasMLWrapper):
             )
         if self.met_features is not None:
             predictions = self.model.predict_dict(
-                data, verbose=0, batch_size=128
+                data, verbose=0, batch_size=2048
             )["assignment"]
         else:
             predictions = self.model.predict_dict(
-                data, verbose=0, batch_size=128
+                data, verbose=0, batch_size=2048
             )["assignment"]
         one_hot = self.generate_one_hot_encoding(predictions, exclusive)
         return one_hot
@@ -293,17 +285,17 @@ class KerasFFRecoBase(EventReconstructorBase, KerasMLWrapper):
                 neutrino_prediction = self.model.predict_dict(
                     [data["jet_inputs"], data["lep_inputs"], data["met_inputs"]],
                     verbose=0,
-                    batch_size=128,
+                    batch_size=2048,
                 )["regression"]
             else:
                 neutrino_prediction = self.model.predict_dict(
-                    [data["jet_inputs"], data["lep_inputs"]], verbose=0, batch_size=128
+                    [data["jet_inputs"], data["lep_inputs"]], verbose=0, batch_size=2048
                 )["regression"]
             return neutrino_prediction
         else:
             return super().reconstruct_neutrinos(data)
 
-    def complete_forward_pass(self, data: dict[str : np.ndarray]):
+    def complete_forward_pass(self, data: dict[str : np.ndarray], return_probs=False):
         """
         Performs a complete forward pass through the model, returning both
         jet-lepton assignment predictions and neutrino kinematics reconstruction.
@@ -318,8 +310,6 @@ class KerasFFRecoBase(EventReconstructorBase, KerasMLWrapper):
                 - A one-hot encoded array of shape (batch_size, max_jets, 2),
                   representing jet-lepton assignments.
                 - An array containing the reconstructed neutrino kinematics.
-        Raises:
-            ValueError: If the model is not built (i.e., `self.model` is None).
         """
 
         if self.model is None:
@@ -332,16 +322,17 @@ class KerasFFRecoBase(EventReconstructorBase, KerasMLWrapper):
                 predictions = self.model.predict_dict(
                     [data["jet_inputs"], data["lep_inputs"], data["met_inputs"]],
                     verbose=0,
-                    batch_size=128,
+                    batch_size=2048,
                 )
             else:
                 predictions = self.model.predict_dict(
-                    [data["jet_inputs"], data["lep_inputs"]], verbose=0, batch_size=128
+                    [data["jet_inputs"], data["lep_inputs"]], verbose=0, batch_size=2048
                 )
             assignment_predictions = self.generate_one_hot_encoding(
                 predictions["assignment"], exclusive=True
             )
-            neutrino_reconstruction = predictions["regression"]
+            neutrino_reconstruction = predictions["regression"] 
+
             return assignment_predictions, neutrino_reconstruction
         else:
             assignment_predictions = self.predict_indices(data, exclusive=True)

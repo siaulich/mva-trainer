@@ -9,6 +9,8 @@
 # Ignore directories for outputs, logs, and temporary files
 **logs/
 **plots/
+**models/
+**config/
 **.vscode/
 **__pycache__/
 **venv/
@@ -17,7 +19,4 @@
 
 
 # Ignore specific files and directories
-config
-models/
-legacy_models/
 CONDOR/submit_params

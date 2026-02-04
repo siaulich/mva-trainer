@@ -204,7 +204,7 @@ class FeatureConcatTransformerReconstructor(KerasFFRecoBase):
         num_heads=8,
         compute_HLF=True,
         use_global_event_features=False,
-        log_variables=False,
+        log_variables=True,
     ):
         """
         Builds the Assignment Transformer model.
@@ -281,7 +281,6 @@ class FeatureConcatTransformerReconstructor(KerasFFRecoBase):
             num_layers=3,
             activation=None,
             name="jet_output_embedding",
-            dropout_rate=dropout_rate,
         )(jets_transformed)
 
         jet_assignment_probs = TemporalSoftmax(axis=1, name="assignment")(

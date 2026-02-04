@@ -14,11 +14,14 @@ error = logs/job_$(Cluster)_$(EventNumbers).err
 log = logs/job_$(Cluster)_$(EventNumbers).log
 
 arguments = python3 ../TrainScript.py \
-    --output_dir /afs/desy.de/user/a/aulich/mva-trainer/models/model_$(Cluster)/ \
+    --output_dir ../models/$(ModelName)/ \
     --load_config train_regression/load_config.yaml \
     --train_config train_regression/train_config.yaml \
-    --model_config train_regression/model_config.yaml \
-    --event_numbers $(EventNumbers) \
+    --model_config models/$(ModelName).yaml \
+    --event_numbers $(EventNumbers) 
 
 # Queue from file - reads each line and assigns to variables
-queue EventNumbers from scripts/event_numbers.txt
+queue EventNumbers from (
+    even
+    odd
+)

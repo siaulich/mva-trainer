@@ -21,7 +21,7 @@ from copy import deepcopy
 
 @keras.utils.register_keras_serializable()
 class KerasModelWrapper(keras.Model):
-    def predict_dict(self, x, batch_size=None, verbose=0, steps=None, **kwargs):
+    def predict_dict(self, x, batch_size=2048, verbose=0, steps=None, **kwargs):
         predictions = super().predict(
             x, batch_size=batch_size, verbose=verbose, steps=steps, **kwargs
         )
@@ -116,7 +116,7 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
                     "Regression layer is not a Rescaling layer. Cannot prepare regression targets."
                 )
             regression_std = upscale_layer.scale
-            regression_mean = upscale_layer.offset 
+            regression_mean = upscale_layer.offset
             y_train["normalized_regression"] = (
                 regression_data - regression_mean
             ) / regression_std
@@ -244,7 +244,6 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
             normed_hlf_inputs = keras.layers.Normalization(
                 name="hlf_input_normalization", axis=(-1, -2)
             )(high_level_features)
-            self.inputs["hlf_inputs"] = high_level_features
             self.transformed_inputs["hlf_inputs"] = high_level_features
             self.normed_inputs["hlf_inputs"] = normed_hlf_inputs
 
@@ -262,7 +261,7 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
         batch_size,
         sample_weights=None,
         validation_split=0.2,
-        callbacks=None,
+        callbacks=[],
         copy_data=False,
         **kwargs,
     ):
@@ -276,6 +275,11 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
         )
         if self.trainable_model is None:
             self.trainable_model = self.model
+
+        callbacks = callbacks if callbacks is not None else []
+        callbacks.append(
+            keras.callbacks.TerminateOnNaN()
+        )  # Ensure training stops on NaN loss
 
         if self.history is None:
             self.history = self.trainable_model.fit(
@@ -389,10 +393,7 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
             inbound_nodes = target_layer._inbound_nodes
             if not inbound_nodes:
                 raise ValueError(f"Layer '{target_layer_name}' has no inbound nodes.")
-            # assume single inbound node (standard case)
             inbound_tensors = inbound_nodes[0].input_tensors
-            # find model input(s) corresponding to those tensors
-            # Build a submodel from inputs -> pre-normalization outputs
             submodel = keras.Model(
                 inputs=model.inputs,
                 outputs=(
@@ -419,7 +420,6 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
                 if not isinstance(submodel_inputs, list):
                     submodel_inputs = [submodel_inputs]
 
-                # Prepare input data for the submodel
                 submodel_input_data = {}
                 for input_tensor in submodel_inputs:
                     input_name = input_tensor.name.split(":")[0]
@@ -438,12 +438,15 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
                 del submodel
                 print("Adapted normalization layer: ", layer.name)
 
-        if self.perform_regression and "normalized_regression" in self.model.output_names:
+        if (
+            self.perform_regression
+            and "normalized_regression" in self.model.output_names
+        ):
             neutrino_truth_std = np.std(data["regression"], axis=0)
-            #neutrino_truth_mean = np.mean(data["regression"], axis=0)
+            # neutrino_truth_mean = np.mean(data["regression"], axis=0)
             denormalisation_layer = keras.layers.Rescaling(
                 scale=neutrino_truth_std,
-                #offset=neutrino_truth_mean,
+                # offset=neutrino_truth_mean,
                 name="regression",
             )
             self.model = KerasModelWrapper(

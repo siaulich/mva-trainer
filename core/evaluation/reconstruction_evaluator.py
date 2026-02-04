@@ -327,15 +327,11 @@ class ReconstructionVariableHandler:
             print(
                 f"Warning: NaN or infinite neutrino predictions found for reconstructor {self.prediction_manager.reconstructors[reconstructor_index].get_full_reco_name()}. These events will be skipped in variable computation."
             )
-            neutrino_pred[~valid_events_mask] = 1 
+            neutrino_pred[~valid_events_mask] = 1
 
-        lepton_features = self.X_test[
-            "lep_inputs"
-        ]
+        lepton_features = self.X_test["lep_inputs"]
 
-        jet_features = self.X_test["jet_inputs"][
-            :, :, :4
-        ]
+        jet_features = self.X_test["jet_inputs"][:, :, :4]
         selected_jet_indices = assignment_pred.argmax(axis=-2)
         reco_jets = np.take_along_axis(
             jet_features,
@@ -909,7 +905,6 @@ class ReconstructionEvaluator:
             ax=ax,
         )
 
-
     def plot_binned_reco_resolution(
         self,
         feature_data_type: str,
@@ -1083,7 +1078,6 @@ class ReconstructionEvaluator:
             ax=ax,
         )
 
-
     def plot_deviations_distributions_all_reconstructors(
         self,
         variable_name: str,
@@ -1256,13 +1250,17 @@ class ReconstructionEvaluator:
         defaults = {
             "use_relative_deviation": config.get("use_relative_deviation", False),
             "combine_tops": config.get("combine_tops", False),
-            "deviation_function": config.get("deviation_function", None)
+            "deviation_function": config.get("deviation_function", None),
         }
         if "deviation_label" in config:
             variable_label = config["deviation_label"]
         else:
             label = config["label"]
-            variable_label = f"Relative Deviation in {label}" if config["use_relative_deviation"] else f"Deviation in {label}"
+            variable_label = (
+                f"Relative Deviation in {label}"
+                if config["use_relative_deviation"]
+                else f"Deviation in {label}"
+            )
 
         defaults.update(kwargs)
 
@@ -1792,7 +1790,7 @@ class ReconstructionEvaluator:
         for lepton_idx in range(self.config.NUM_LEPTONS):
             for comp_idx in range(len(component_labels)):
                 ax[lepton_idx, comp_idx].get_legend().remove()
-                #pass
+                # pass
 
         # Add single legend for the whole figure
         fig.legend(
