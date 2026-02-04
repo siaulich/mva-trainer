@@ -1,4 +1,4 @@
-import keras
+import keras as keras
 import tensorflow as tf
 
 
@@ -34,8 +34,6 @@ class AssignmentAccuracy(keras.metrics.Metric):
         config = super().get_config()
         return config
 
-import tensorflow as tf
-from tensorflow import keras
 
 @keras.utils.register_keras_serializable()
 class RegressionDeviation(keras.metrics.Metric):

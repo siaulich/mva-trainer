@@ -16,7 +16,7 @@ def compute_sample_weights(X_train : dict, y_train, padding_value: float = -999)
     for key in X_train.keys():
         if "event_weight" in key:
             event_weights = X_train[key].flatten()
-        if "jet" in key:
+        if "jet_inputs" in key:
             jet_features = X_train[key]
             break
     if jet_features is None:

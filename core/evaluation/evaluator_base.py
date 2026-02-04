@@ -11,7 +11,7 @@ class PlotConfig:
 
     figsize: Tuple[int, int] = (10, 6)
     confidence: float = 0.95
-    n_bootstrap: int = 1000
+    n_bootstrap: int = 10
     show_errorbar: bool = True
     alpha: float = 0.3
 
@@ -22,7 +22,7 @@ class BootstrapCalculator:
     @staticmethod
     def compute_bootstrap_ci(
         data: np.ndarray,
-        n_bootstrap: int = 1000,
+        n_bootstrap: int = 10,
         confidence: float = 0.95,
         statistic_fn=np.mean,
     ) -> Tuple[float, float, float]:
@@ -61,7 +61,7 @@ class BootstrapCalculator:
         binning_mask: np.ndarray,
         event_weights: np.ndarray,
         data: np.ndarray,
-        n_bootstrap: int = 1000,
+        n_bootstrap: int = 10,
         confidence: float = 0.95,
         statistic: str = "mean",
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -111,7 +111,7 @@ class BootstrapCalculator:
         event_weights: np.ndarray,
         data: Tuple[np.ndarray],
         function : Callable = np.mean,
-        n_bootstrap: int = 1000,
+        n_bootstrap: int = 10,
         confidence: float = 0.95,
         statistic: str = "mean",
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -360,7 +360,7 @@ class AccuracyCalculator:
         n_leptons: int = 2,
     ) -> np.ndarray:
         """Compute random assignment baseline accuracy."""
-        num_jets = np.all(X_test["jet"] != padding_value, axis=-1).sum(axis=-1)
+        num_jets = np.all(X_test["jet_inputs"] != padding_value, axis=-1).sum(axis=-1)
         return 1 / (num_jets * (num_jets - 1))
 
 class SelectionAccuracyCalculator:
@@ -374,7 +374,7 @@ class SelectionAccuracyCalculator:
         n_leptons: int = 2,
     ) -> np.ndarray:
         """Compute random assignment baseline accuracy."""
-        num_jets = np.all(X_test["jet"] != padding_value, axis=-1).sum(axis=-1)
+        num_jets = np.all(X_test["jet_inputs"] != padding_value, axis=-1).sum(axis=-1)
         return 2 / (num_jets * (num_jets - 1))
 
     @staticmethod
@@ -410,7 +410,7 @@ class NeutrinoDeviationCalculator:
         n_leptons: int = 2,
     ) -> np.ndarray:
         """Compute random assignment baseline accuracy."""
-        num_jets = np.all(X_test["jet"] != padding_value, axis=-1).sum(axis=-1)
+        num_jets = np.all(X_test["jet_inputs"] != padding_value, axis=-1).sum(axis=-1)
         return 2 / (num_jets * (num_jets - 1))
 
     @staticmethod
@@ -472,12 +472,8 @@ class NeutrinoDeviationCalculator:
         Returns:
             Deviation value(s)
         """
-        # Compute L2 norm of the difference for each neutrino
-        # Shape: (n_events, 2)
         diff_norm = np.linalg.norm(predicted_neutrinos - true_neutrinos, axis=-1)
         
-        # Average over both neutrinos
-        # Shape: (n_events,)
         per_event_deviation = np.mean(diff_norm, axis=-1)
         
         if per_event:

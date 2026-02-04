@@ -1,7 +1,7 @@
 numpy
 tensorflow
 keras
-tf2onnx==1.16.1
+tf2onnx
 onnxruntime
 scikit-learn
 matplotlib

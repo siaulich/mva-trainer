@@ -1,5 +1,5 @@
 import tensorflow as tf
-import keras
+import keras as keras
 
 
 @keras.utils.register_keras_serializable()

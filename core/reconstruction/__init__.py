@@ -33,7 +33,6 @@ __all__ = [
     # Plotting utilities
     "AccuracyPlotter",
     "ConfusionMatrixPlotter",
-    "ComplementarityPlotter",
     "ResolutionPlotter",
     
     # Physics calculations

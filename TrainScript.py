@@ -2,7 +2,7 @@ import sys
 import argparse
 import os
 import numpy as np
-import keras
+import keras as keras
 import matplotlib.pyplot as plt
 import yaml
 import tensorflow as tf
@@ -22,14 +22,15 @@ class TrainConfig:
     callbacks: Optional[Dict[str, any]] = field(default_factory=dict)
     validation_split: float = 0.1
     shuffle: bool = True
+    verbose: int = 1
 
 
 @dataclass
 class ModelConfig:
     model_type: str = "FeatureConcatTransformer"
-    model_options: Dict[str, any]  = field(default_factory=dict)
+    model_options: Dict[str, any] = field(default_factory=dict)
     model_params: Dict[str, any] = field(default_factory=dict)
-    compile_options: Dict[str, any]  = field(default_factory=dict)
+    compile_options: Dict[str, any] = field(default_factory=dict)
 
 
 from core.DataLoader import (
@@ -120,8 +121,9 @@ if __name__ == "__main__":
     build_options = model_config.model_options
     build_options.update(**model_config.model_params)
 
-    print(build_options)
     even_trained_model.build_model(**(build_options))
+
+    even_trained_model.adapt_normalization_layers(X)
 
     even_trained_model.compile_model(
         optimizer=keras.optimizers.get(model_config.compile_options["optimizer"]),
@@ -136,8 +138,11 @@ if __name__ == "__main__":
             ]
             for key, value in model_config.compile_options["metrics"].items()
         },
+        loss_weights=model_config.compile_options.get("loss_weights", {}),
+        add_physics_informed_loss=model_config.compile_options.get(
+            "add_physics_informed_loss", False
+        ),
     )
-    even_trained_model.adapt_normalization_layers(X)
 
     train_options = deepcopy(train_config.__dict__)
 
@@ -149,7 +154,6 @@ if __name__ == "__main__":
 
     even_history = even_trained_model.train_model(
         X,
-        y,
         **train_options,
     )
 

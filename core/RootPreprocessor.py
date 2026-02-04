@@ -275,6 +275,8 @@ class RootPreprocessor:
         reco_mllbb = self._compute_reco_mllbb(leptons, jets)
         processed.update(reco_mllbb)
 
+
+
         # Extract truth information
         truth = self._extract_truth_info(events)
         processed.update(truth)
@@ -503,6 +505,8 @@ class RootPreprocessor:
         # Number of jets per event
         n_jets = ak.to_numpy(n_jets).astype(np.int32)
 
+        n_bjets = np.sum(jet_btag_np >= 2, axis = -1)
+
         return {
             "jet_pt": jet_pt_np,
             "jet_eta": jet_eta_np,
@@ -511,6 +515,7 @@ class RootPreprocessor:
             "jet_b_tag": jet_btag_np,
             "event_jet_truth_idx": event_jet_truth_idx,
             "N_jets": n_jets,
+            "N_bjets": n_bjets,
         }
 
     def _process_met(self, events: ak.Array) -> Dict[str, np.ndarray]:
@@ -702,6 +707,7 @@ class RootPreprocessor:
 
         total = b1_4 + b2_4 + l1_4 + l2_4
         return {"reco_mllbb": compute_mass_from_lorentz_vector_array(total)}
+        
 
     @staticmethod
     def _delta_r(eta1, phi1, eta2, phi2):

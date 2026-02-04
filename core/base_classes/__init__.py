@@ -1,2 +1,2 @@
-from .BaseUtilityClass import BaseUtilityModel
-from .MachineLearningBase import KerasMLWrapper, KerasModelWrapper
+from .base_utility_class import BaseUtilityModel
+from .machine_learning_base import KerasMLWrapper, KerasModelWrapper

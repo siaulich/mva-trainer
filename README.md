@@ -102,7 +102,7 @@ print(f"Loaded {data_loader.data_length} events")
 # Access features
 jet_features = data_loader.feature_data['jet']  # (n_events, max_jets, n_jet_features)
 lepton_features = data_loader.feature_data['lepton']  # (n_events, 2, n_lepton_features)
-labels = data_loader.feature_data['assignment_labels']  # (n_events, max_jets, 2)
+labels = data_loader.feature_data['assignment']  # (n_events, max_jets, 2)
 
 # Split data for training
 X_train, y_train, X_test, y_test = data_loader.split_data(test_size=0.2)

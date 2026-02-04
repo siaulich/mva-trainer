@@ -1,4 +1,4 @@
-import keras
+import keras as keras
 import tensorflow as tf
 from keras.layers import LSTM, GRU, RNN, LSTMCell, Bidirectional, GRUCell
 

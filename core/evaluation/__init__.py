@@ -13,7 +13,6 @@ from .reco_variable_config import reconstruction_variable_configs
 from .plotting_utils import (
     AccuracyPlotter,
     ConfusionMatrixPlotter,
-    ComplementarityPlotter,
     ResolutionPlotter,
 )
 from .physics_calculations import (
@@ -21,5 +20,6 @@ from .physics_calculations import (
     ResolutionCalculator,
     c_hel,
     c_han
+    
 )
 

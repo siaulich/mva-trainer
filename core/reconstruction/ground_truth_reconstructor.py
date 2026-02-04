@@ -17,7 +17,7 @@ class GroundTruthReconstructor(EventReconstructorBase):
         self.config = config
 
     def predict_indices(self, data_dict):
-        return data_dict["assignment_labels"]
+        return data_dict["assignment"]
 
     def reconstruct_neutrinos(self, data_dict):
         return super().reconstruct_neutrinos(data_dict)

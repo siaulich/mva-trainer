@@ -180,8 +180,8 @@ class DataPreprocessor:
         """
         X = {k: v for k, v in feature_data.items() if v is not None}
         y = {
-            "assignment_labels": X["assignment_labels"],
-            "neutrino_truth": X.get("neutrino_truth", None),
+            "assignment": X["assignment"],
+            "regression": X.get("regression", None),
         }
         return X, y
 
@@ -232,7 +232,7 @@ class DataPreprocessor:
         # Remove NaN events from NuFlows if present
         self._filter_nuflows_nans()
 
-        self.data_length = len(self.feature_data["assignment_labels"])
+        self.data_length = len(self.feature_data["assignment"])
 
         # Create DataConfig for downstream use
         self.data_config = self.load_config.to_data_config()
@@ -264,25 +264,25 @@ class DataPreprocessor:
     def _load_core_features(self, loaded: Dict) -> None:
         """Load core jet and lepton features."""
         if self.load_config.jet_features:
-            self.feature_data["jet"] = self._load_feature_array(
+            self.feature_data["jet_inputs"] = self._load_feature_array(
                 loaded, self.load_config.jet_features, max_objects=self.load_config.max_jets
             )
 
         if self.load_config.lepton_features:
-            self.feature_data["lepton"] = self._load_feature_array(
+            self.feature_data["lep_inputs"] = self._load_feature_array(
                 loaded, self.load_config.lepton_features
             )
 
     def _load_optional_features(self, loaded: Dict) -> None:
         """Load optional features (MET, global, non-training, weights)."""
         if self.load_config.global_event_features:
-            self.feature_data["global_event"] = self._load_feature_array(
+            self.feature_data["global_event_inputs"] = self._load_feature_array(
                 loaded, self.load_config.global_event_features
             )
 
         if self.load_config.met_features:
             met_data = self._load_feature_array(loaded, self.load_config.met_features)
-            self.feature_data["met"] = met_data[:, np.newaxis, :]
+            self.feature_data["met_inputs"] = met_data[:, np.newaxis, :]
 
         if self.load_config.non_training_features:
             self.feature_data["non_training"] = self._load_feature_array(
@@ -304,7 +304,7 @@ class DataPreprocessor:
                            self.load_config.antineutrino_momentum_features)
             data_length = len(loaded[combined_keys[0]])
             target_shape = (data_length, self.load_config.NUM_LEPTONS, -1)
-            self.feature_data["neutrino_truth"] = self._load_feature_array(
+            self.feature_data["regression"] = self._load_feature_array(
                 loaded, combined_keys, target_shape=target_shape
             )
 
@@ -348,11 +348,11 @@ class DataPreprocessor:
                 loaded[self.load_config.lepton_truth_label],
             ),
         )
-        assignment_labels, reco_mask = label_builder.build_labels()
+        assignment, reco_mask = label_builder.build_labels()
 
         # Apply reconstruction mask to all features
         self._apply_mask_to_features(reco_mask)
-        self.feature_data["assignment_labels"] = assignment_labels
+        self.feature_data["assignment"] = assignment
 
     def _filter_nuflows_nans(self) -> None:
         """Remove events with NaNs in NuFlows targets if present."""
@@ -450,7 +450,7 @@ class DataPreprocessor:
         # Get feature index from DataConfig
         feature_idx = self.data_config.get_feature_index(data_type, feature_name)
 
-        if data_type in ["jet", "lepton", "met"]:
+        if data_type in ["jet_inputs", "lep_inputs", "met_inputs"]:
             return self.feature_data[data_type][:, :, feature_idx].copy()
         elif data_type in ["non_training", "custom"]:
             return self.feature_data[data_type][:, feature_idx].copy()

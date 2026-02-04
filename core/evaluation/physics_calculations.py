@@ -1,7 +1,7 @@
 """Physics calculations for event reconstruction."""
 
 import numpy as np
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Callable
 
 from core.utils import (
     lorentz_vector_from_PtEtaPhiE_array,
@@ -87,56 +87,23 @@ class TopReconstructor:
         ttbar_p4 = top1_p4 + top2_p4
         return compute_mass_from_lorentz_vector_array(ttbar_p4)
     
-    @staticmethod
-    def project_vectors_onto_axis(
-        vectors: np.ndarray,
-        axis: np.ndarray,
-    ) -> np.ndarray:
-        """
-        Project vectors onto a given axis.
-
-        Args:
-            vectors: Array of vectors (n_events, 3)
-            axis: Axis to project onto (3,)
-
-        Returns:
-            Array of projected components (n_events,)
-        """
-        axis_norm = np.linalg.norm(axis)
-        axis_norm = np.clip(axis_norm, 1e-10, None)  # Avoid division by zero
-        
-        # Check for finite values
-        valid_axis = np.isfinite(axis_norm) & np.all(np.isfinite(axis))
-        axis_norm = np.where(valid_axis, axis_norm, 1.0)
-        
-        unit_axis = axis / axis_norm
-        unit_axis = np.where(valid_axis, unit_axis, 0.0)
-        
-        # Safe dot product
-        valid_vectors = np.all(np.isfinite(vectors), axis=1, keepdims=True)
-        projections = np.dot(vectors, unit_axis)
-        
-        # Return 0 for invalid cases
-        projections = np.where(np.isfinite(projections) & valid_vectors.squeeze(), projections, 0.0)
-        return projections
-
-
 class ResolutionCalculator:
     """Calculate mass resolution metrics."""
 
     @staticmethod
     def compute_deviation(
-        reconstructed_masses: np.ndarray,
-        true_masses: np.ndarray,
+        reco_values: np.ndarray,
+        true_values: np.ndarray,
         use_relative_deviation: bool = True,
-        use_signed_deviation: bool = False,
+        use_signed_deviation: bool = True,
+        deviation_function: Optional[Callable] = None
     ) -> np.ndarray:
         """
         Compute deviations between reconstructed and true masses.
 
         Args:
-            reconstructed_masses: Array of reconstructed masses
-            true_masses: Array of true masses
+            reco_values: Array of reconstructed masses
+            true_values: Array of true masses
             use_relative_deviation: If True, compute relative deviations
             use_signed_deviation: If True, keep sign of deviations
         Returns:
@@ -144,23 +111,28 @@ class ResolutionCalculator:
         """
         # Filter out invalid values before computation
         valid_mask = (
-            np.isfinite(reconstructed_masses) & 
-            np.isfinite(true_masses) & 
-            (true_masses != 0) &
-            (reconstructed_masses != -999)  # padding value
+            np.isfinite(reco_values) & 
+            np.isfinite(true_values) & 
+            (true_values != 0) &
+            (reco_values != -999)  # padding value
         )
         
-        if use_relative_deviation:
+        if deviation_function is not None:
+            deviations = deviation_function(true_values, reco_values)
+        elif use_relative_deviation:
             with np.errstate(divide='ignore', invalid='ignore'):
-                deviations = (reconstructed_masses - true_masses) / true_masses
+                deviations = (reco_values - true_values) / true_values
+            if not use_signed_deviation:
+                deviations = np.abs(deviations)
         else:
-            deviations = reconstructed_masses - true_masses
+            deviations = reco_values - true_values
+            if not use_signed_deviation:
+                deviations = np.abs(deviations)
+
+
 
         # Set invalid entries to NaN so they can be filtered later
         deviations = np.where(valid_mask, deviations, np.nan)
-
-        if not use_signed_deviation:
-            deviations = np.abs(deviations)
 
         return deviations
 

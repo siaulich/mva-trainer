@@ -1,4 +1,4 @@
-import keras
+import keras as keras
 import tensorflow as tf
 
 @keras.utils.register_keras_serializable()

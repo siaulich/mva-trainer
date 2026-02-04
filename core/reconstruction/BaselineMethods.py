@@ -50,7 +50,7 @@ class BaselineAssigner(EventReconstructorBase):
 
     def get_jets_mask(self, data_dict):
         padding_value = self.config.padding_value
-        jet_mask = (data_dict["jet"] != padding_value).all(
+        jet_mask = (data_dict["jet_inputs"] != padding_value).all(
             axis=-1
         )  # Shape: (num_events, max_jets)
 
@@ -73,13 +73,13 @@ class BaselineAssigner(EventReconstructorBase):
         jet_b_tag = None
         jet_pt = None
 
-        for feature in self.feature_index_dict["jet"]:
+        for feature in self.feature_index_dict["jet_inputs"]:
             if "btag" in feature.lower() or "b_tag" in feature.lower():
-                jet_b_tag = data_dict["jet"][
-                    :, :, self.feature_index_dict["jet"][feature]
+                jet_b_tag = data_dict["jet_inputs"][
+                    :, :, self.feature_index_dict["jet_inputs"][feature]
                 ]
             if "pt" in feature.lower():
-                jet_pt = data_dict["jet"][:, :, self.feature_index_dict["jet"][feature]]
+                jet_pt = data_dict["jet_inputs"][:, :, self.feature_index_dict["jet_inputs"][feature]]
 
         if jet_b_tag is not None:
             b_tag_mask = (jet_b_tag >= 2) & jet_mask[:, :, 0]
@@ -184,22 +184,22 @@ class DeltaRAssigner(BaselineAssigner):
         Returns:
             np.ndarray: A 3D array of shape (num_events, max_jets, NUM_LEPTONS) representing the Delta R values.
         """
-        leptons = data_dict["lepton"]
-        jets = data_dict["jet"]
+        leptons = data_dict["lep_inputs"]
+        jets = data_dict["jet_inputs"]
         lepton_eta = None
         lepton_phi = None
         for feature in self.lepton_features:
             if "eta" in feature.lower():
-                lepton_eta = leptons[:, :, self.feature_index_dict["lepton"][feature]]
+                lepton_eta = leptons[:, :, self.feature_index_dict["lep_inputs"][feature]]
             if "phi" in feature.lower():
-                lepton_phi = leptons[:, :, self.feature_index_dict["lepton"][feature]]
+                lepton_phi = leptons[:, :, self.feature_index_dict["lep_inputs"][feature]]
         jet_eta = None
         jet_phi = None
         for feature in self.jet_features:
             if "eta" in feature.lower():
-                jet_eta = jets[:, :, self.feature_index_dict["jet"][feature]]
+                jet_eta = jets[:, :, self.feature_index_dict["jet_inputs"][feature]]
             if "phi" in feature.lower():
-                jet_phi = jets[:, :, self.feature_index_dict["jet"][feature]]
+                jet_phi = jets[:, :, self.feature_index_dict["jet_inputs"][feature]]
         if (
             lepton_eta is None
             or lepton_phi is None
@@ -258,7 +258,7 @@ class ChiSquareAssigner(BaselineAssigner):
         if self.use_nu_flows_for_assignment:
             return data_dict["nu_flows_neutrino_truth"]
         else:
-            return data_dict["neutrino_truth"]
+            return data_dict["regression"]
 
     def construct_neutrino_four_vectors(self, data_dict):
         neutrino_3_vector = self.get_neutrino_momenta(data_dict)
@@ -299,23 +299,23 @@ class ChiSquareAssigner(BaselineAssigner):
         Returns:
             np.ndarray: A 3D array of shape (num_events, max_jets, NUM_LEPTONS) representing the predicted indices.
         """
-        leptons = data_dict["lepton"]
-        jets = data_dict["jet"][
+        leptons = data_dict["lep_inputs"]
+        jets = data_dict["jet_inputs"][
             :, :, :4
         ]  # Assuming first 4 features are pt, eta, phi, e
 
         lepton_four_vectors = self.get_four_vector(
-            leptons[:, :, self.feature_index_dict["lepton"]["lep_pt"]],
-            leptons[:, :, self.feature_index_dict["lepton"]["lep_eta"]],
-            leptons[:, :, self.feature_index_dict["lepton"]["lep_phi"]],
-            leptons[:, :, self.feature_index_dict["lepton"]["lep_e"]],
+            leptons[:, :, self.feature_index_dict["lep_inputs"]["lep_pt"]],
+            leptons[:, :, self.feature_index_dict["lep_inputs"]["lep_eta"]],
+            leptons[:, :, self.feature_index_dict["lep_inputs"]["lep_phi"]],
+            leptons[:, :, self.feature_index_dict["lep_inputs"]["lep_e"]],
         )
 
         jet_four_vectors = self.get_four_vector(
-            jets[:, :, self.feature_index_dict["jet"]["jet_pt"]],
-            jets[:, :, self.feature_index_dict["jet"]["jet_eta"]],
-            jets[:, :, self.feature_index_dict["jet"]["jet_phi"]],
-            jets[:, :, self.feature_index_dict["jet"]["jet_e"]],
+            jets[:, :, self.feature_index_dict["jet_inputs"]["jet_pt"]],
+            jets[:, :, self.feature_index_dict["jet_inputs"]["jet_eta"]],
+            jets[:, :, self.feature_index_dict["jet_inputs"]["jet_phi"]],
+            jets[:, :, self.feature_index_dict["jet_inputs"]["jet_e"]],
         )
 
         nu_four_vector, anu_four_vector = self.construct_neutrino_four_vectors(

@@ -1,4 +1,4 @@
-import keras
+import keras as keras
 import tensorflow as tf
 import math
 
@@ -94,12 +94,6 @@ class InputMetPhiLayer(keras.layers.Layer):
         super().__init__(**kwargs)
 
     def call(self, inputs):
-        tf.debugging.assert_equal(
-            tf.shape(inputs)[-1],
-            2,
-            message="Input tensor must have exactly 2 features: (met, met_phi)",
-        )
-
         met = inputs[..., 0:1]
         met_phi = inputs[..., 1:2]
 

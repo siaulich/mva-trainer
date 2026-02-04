@@ -1,17 +1,18 @@
 """Evaluator for comparing event reconstruction methods."""
 
 import numpy as np
-from typing import Union, Optional, List, Tuple
+from typing import Union, Optional, List, Tuple, Callable
 import matplotlib.pyplot as plt
 import os
 import timeit
-import keras
+import keras as keras
 from core.reconstruction import (
     EventReconstructorBase,
     GroundTruthReconstructor,
     KerasFFRecoBase,
     CompositeNeutrinoComponentReconstructor,
 )
+import seaborn as sns
 from core.base_classes import KerasMLWrapper
 from .evaluator_base import (
     PlotConfig,
@@ -25,22 +26,25 @@ from .evaluator_base import (
 from .plotting_utils import (
     AccuracyPlotter,
     ConfusionMatrixPlotter,
-    ComplementarityPlotter,
     ResolutionPlotter,
     NeutrinoDeviationPlotter,
     SelectionAccuracyPlotter,
     DistributionPlotter,
 )
+
 from .physics_calculations import (
     TopReconstructor,
     ResolutionCalculator,
-    lorentz_vector_from_PtEtaPhiE_array,
     c_hel,
     c_han,
 )
 from .reco_variable_config import reconstruction_variable_configs
 
-from core.utils import compute_pt_from_lorentz_vector_array
+from core.utils import (
+    compute_pt_from_lorentz_vector_array,
+    project_vectors_onto_axis,
+    lorentz_vector_from_PtEtaPhiE_array,
+)
 
 
 class PredictionManager:
@@ -53,7 +57,7 @@ class PredictionManager:
         y_test: dict,
         load_directory: Optional[str] = None,
     ):
-    # Handle single reconstructor
+        # Handle single reconstructor
         if isinstance(reconstructors, EventReconstructorBase):
             reconstructors = [reconstructors]
 
@@ -106,7 +110,9 @@ class PredictionManager:
             )
             os.makedirs(reconstructor_dir, exist_ok=True)
 
-            assignment_path = os.path.join(reconstructor_dir, "assignment_predictions.npz")
+            assignment_path = os.path.join(
+                reconstructor_dir, "assignment_predictions.npz"
+            )
             np.savez(
                 assignment_path,
                 predictions=self.predictions[idx]["assignment"],
@@ -134,7 +140,9 @@ class PredictionManager:
                 input_dir, reconstructor.get_full_reco_name().replace(" ", "_")
             )
 
-            assignment_path = os.path.join(reconstructor_dir, "assignment_predictions.npz")
+            assignment_path = os.path.join(
+                reconstructor_dir, "assignment_predictions.npz"
+            )
             assignment_data = np.load(assignment_path)
             assignment_predictions = assignment_data["predictions"]
 
@@ -159,13 +167,13 @@ class PredictionManager:
         loaded_event_indices = event_indices_data["event_indices"]
         if "event_number" not in self.X_test:
             raise ValueError(
-                "Event indices not found in X_test. "
-                "Cannot align loaded predictions."
+                "Event indices not found in X_test. " "Cannot align loaded predictions."
             )
         current_event_indices = FeatureExtractor.get_event_indices(self.X_test)
         if not np.array_equal(loaded_event_indices, current_event_indices):
-            shared_event_indicies = np.union1d(loaded_event_indices, current_event_indices)
-
+            shared_event_indicies = np.union1d(
+                loaded_event_indices, current_event_indices
+            )
 
     def get_assignment_predictions(self, index: int) -> np.ndarray:
         """Get assignment predictions for a specific reconstructor."""
@@ -217,13 +225,11 @@ class ComplementarityAnalyzer:
             Complementarity matrix (n_reconstructors, n_reconstructors)
         """
 
-        # Get per-event accuracy for each reconstructor
         per_event_accuracies = self._get_all_per_event_accuracies()
 
         n_reconstructors = len(per_event_accuracies)
         complementarity_matrix = np.zeros((n_reconstructors, n_reconstructors))
 
-        # Compute complementarity
         for i in range(n_reconstructors):
             for j in range(n_reconstructors):
                 if i != j:
@@ -257,7 +263,7 @@ class ComplementarityAnalyzer:
                 continue
             predictions = self.prediction_manager.get_assignment_predictions(i)
             accuracy_data = AccuracyCalculator.compute_accuracy(
-                self.y_test["assignment_labels"],
+                self.y_test["assignment"],
                 predictions,
                 per_event=True,
             )
@@ -294,7 +300,6 @@ class ReconstructionVariableHandler:
         Returns:
             Reconstructed variable array or tuple of (reconstructed, truth) if truth_extractor provided
         """
-        combine_tops = self.configs[variable_name]["combine_tops"]
         if variable_name not in self.configs:
             raise ValueError(f"Variable '{variable_name}' not found in configurations.")
 
@@ -303,33 +308,30 @@ class ReconstructionVariableHandler:
             and reconstructor_index in self.reco_variable_cache[variable_name]
         ):
             print(
-                f"Using cached reconstructed variable '{variable_name}' for reconstructor {self.prediction_manager.reconstructors[reconstructor_index].get_full_reco_name()}.")
+                f"Using cached reconstructed variable '{variable_name}' for reconstructor {self.prediction_manager.reconstructors[reconstructor_index].get_full_reco_name()}."
+            )
             return self.reco_variable_cache[variable_name][reconstructor_index]
 
         variable_func = self.configs[variable_name]["compute_func"]
 
-        # Get predictions
         assignment_pred = self.prediction_manager.get_assignment_predictions(
             reconstructor_index
         )
         neutrino_pred = self.prediction_manager.get_neutrino_predictions(
             reconstructor_index
         )
-        valid_events_mask = np.all(~np.isnan(neutrino_pred), axis = (1,2)) & np.all(np.isfinite(neutrino_pred), axis = (1,2))
+        valid_events_mask = np.all(~np.isnan(neutrino_pred), axis=(1, 2)) & np.all(
+            np.isfinite(neutrino_pred), axis=(1, 2)
+        )
         if not np.all(valid_events_mask):
-            print(f"Warning: NaN or infinite neutrino predictions found for reconstructor {self.prediction_manager.reconstructors[reconstructor_index].get_full_reco_name()}. These events will be skipped in variable computation.")
-            neutrino_pred[~valid_events_mask] = 1  # or some other default value
+            print(
+                f"Warning: NaN or infinite neutrino predictions found for reconstructor {self.prediction_manager.reconstructors[reconstructor_index].get_full_reco_name()}. These events will be skipped in variable computation."
+            )
+            neutrino_pred[~valid_events_mask] = 1
 
+        lepton_features = self.X_test["lep_inputs"]
 
-        # Get lepton features
-        lepton_features = self.X_test[
-            "lepton"
-        ]  # Assuming shape (n_events, n_leptons, n_features)
-
-        # Get correctly assigned jet features
-        jet_features = self.X_test["jet"][
-            :, :, :4
-        ]  # Assuming first 4 features are kinematic (Pt, Eta, Phi, E)
+        jet_features = self.X_test["jet_inputs"][:, :, :4]
         selected_jet_indices = assignment_pred.argmax(axis=-2)
         reco_jets = np.take_along_axis(
             jet_features,
@@ -337,10 +339,8 @@ class ReconstructionVariableHandler:
             axis=1,
         )
 
-        # Compute reconstructed variable
         reconstructed = variable_func(lepton_features, reco_jets, neutrino_pred)
 
-        # Handle per-top quantities
         if isinstance(reconstructed, tuple):
             reconstructed = np.concatenate(reconstructed)
 
@@ -367,8 +367,7 @@ class ReconstructionVariableHandler:
         combine_tops = self.configs[variable_name]["combine_tops"]
         if variable_name not in self.configs:
             raise ValueError(f"Variable '{variable_name}' not found in configurations.")
-        
-        # Use a special key for truth values
+
         truth_cache_key = f"{variable_name}_truth"
         if truth_cache_key in self.reco_variable_cache:
             return self.reco_variable_cache[truth_cache_key]
@@ -377,11 +376,9 @@ class ReconstructionVariableHandler:
 
         truth = truth_extractor(self.X_test)
 
-        # Handle per-top quantities
         if combine_tops and isinstance(truth, tuple):
             truth = np.concatenate(truth)
 
-        # Store truth with special key
         truth_cache_key = f"{variable_name}_truth"
         self.reco_variable_cache[truth_cache_key] = truth
 
@@ -399,21 +396,18 @@ class ReconstructionEvaluator:
 
         self.prediction_manager = prediction_manager
 
-        self.reconstructors = prediction_manager.reconstructors
         self.X_test = prediction_manager.X_test
         self.y_test = prediction_manager.y_test
 
-
-        self.config = self.reconstructors[0].config
+        self.config = self.prediction_manager.reconstructors[0].config
 
         self.variable_handler = ReconstructionVariableHandler(
             reconstruction_variable_configs, prediction_manager, self.X_test
         )
-            
 
     def _validate_configs(self):
         """Validate that all reconstructors have the same configuration."""
-        configs = [r.config for r in self.reconstructors]
+        configs = [r.config for r in self.prediction_manager.reconstructors]
         base_config = configs[0]
 
         for config in configs[1:]:
@@ -435,7 +429,7 @@ class ReconstructionEvaluator:
             reconstructor_index
         )
         return AccuracyCalculator.compute_accuracy(
-            self.y_test["assignment_labels"],
+            self.y_test["assignment"],
             predictions,
             per_event=per_event,
         )
@@ -450,7 +444,7 @@ class ReconstructionEvaluator:
             reconstructor_index
         )
         return SelectionAccuracyCalculator.compute_selection_accuracy(
-            self.y_test["assignment_labels"],
+            self.y_test["assignment"],
             predictions,
             per_event=per_event,
         )
@@ -485,7 +479,7 @@ class ReconstructionEvaluator:
 
     def plot_all_accuracies(
         self,
-        n_bootstrap: int = 10,
+        n_bootstrap: int = 1,
         confidence: float = 0.95,
         figsize: Tuple[int, int] = (10, 6),
     ):
@@ -500,7 +494,7 @@ class ReconstructionEvaluator:
         accuracies = []
 
         names = []
-        for i, reconstructor in enumerate(self.reconstructors):
+        for i, reconstructor in enumerate(self.prediction_manager.reconstructors):
             if isinstance(reconstructor, GroundTruthReconstructor):
                 print(f"{reconstructor.get_assignment_name()}: Ground Truth (skipping)")
                 continue
@@ -516,7 +510,7 @@ class ReconstructionEvaluator:
 
     def plot_all_selection_accuracies(
         self,
-        n_bootstrap: int = 10,
+        n_bootstrap: int = 1,
         confidence: float = 0.95,
         figsize: Tuple[int, int] = (10, 6),
     ):
@@ -531,7 +525,7 @@ class ReconstructionEvaluator:
         selection_accuracies = []
 
         names = []
-        for i, reconstructor in enumerate(self.reconstructors):
+        for i, reconstructor in enumerate(self.prediction_manager.reconstructors):
             if isinstance(reconstructor, GroundTruthReconstructor):
                 print(f"{reconstructor.get_assignment_name()}: Ground Truth (skipping)")
                 continue
@@ -566,7 +560,7 @@ class ReconstructionEvaluator:
         Returns:
             Deviation value(s)
         """
-        if self.y_test.get("neutrino_truth") is None:
+        if self.y_test.get("regression") is None:
             raise ValueError(
                 "No regression targets found in y_test. "
                 "Cannot evaluate neutrino deviation."
@@ -575,7 +569,7 @@ class ReconstructionEvaluator:
         predictions = self.prediction_manager.get_neutrino_predictions(
             reconstructor_index
         )
-        true_neutrinos = self.y_test["neutrino_truth"]
+        true_neutrinos = self.y_test["regression"]
 
         if deviation_type == "relative":
             return NeutrinoDeviationCalculator.compute_relative_deviation(
@@ -613,7 +607,7 @@ class ReconstructionEvaluator:
 
     def plot_all_neutrino_deviations(
         self,
-        n_bootstrap: int = 10,
+        n_bootstrap: int = 1,
         confidence: float = 0.95,
         figsize: Tuple[int, int] = (10, 6),
         deviation_type: str = "relative",
@@ -630,7 +624,7 @@ class ReconstructionEvaluator:
         Returns:
             Tuple of (figure, axis)
         """
-        if self.y_test.get("neutrino_truth") is None:
+        if self.y_test.get("regression") is None:
             raise ValueError(
                 "No regression targets found in y_test. "
                 "Cannot evaluate neutrino deviation."
@@ -646,7 +640,7 @@ class ReconstructionEvaluator:
         deviations = []
         names = []
 
-        for i, reconstructor in enumerate(self.reconstructors):
+        for i, reconstructor in enumerate(self.prediction_manager.reconstructors):
             if isinstance(reconstructor, GroundTruthReconstructor):
                 print(f"{reconstructor.get_full_reco_name()}: Ground Truth (skipping)")
                 # continue
@@ -688,7 +682,7 @@ class ReconstructionEvaluator:
         fancy_feature_label: Optional[str] = None,
         bins: int = 20,
         xlims: Optional[Tuple[float, float]] = None,
-        n_bootstrap: int = 10,
+        n_bootstrap: int = 1,
         confidence: float = 0.95,
         show_errorbar: bool = True,
         show_combinatoric: bool = True,
@@ -730,7 +724,7 @@ class ReconstructionEvaluator:
         print(f"\nComputing binned accuracy for {feature_name}...")
         binned_accuracies = []
         names = []
-        for i, reconstructor in enumerate(self.reconstructors):
+        for i, reconstructor in enumerate(self.prediction_manager.reconstructors):
             if isinstance(reconstructor, GroundTruthReconstructor):
                 continue
             accuracy_data = self.evaluate_accuracy(i, per_event=True)
@@ -750,12 +744,11 @@ class ReconstructionEvaluator:
                 )
                 binned_accuracies.append((binned_acc, binned_acc, binned_acc))
             names.append(reconstructor.get_assignment_name())
-        # Compute bin counts
+
         bin_counts = np.sum(
             event_weights.reshape(1, -1) * binning_mask, axis=1
         ) / np.sum(event_weights)
 
-        # Plot
         feature_label = fancy_feature_label or feature_name
 
         return AccuracyPlotter.plot_binned_accuracy(
@@ -777,7 +770,7 @@ class ReconstructionEvaluator:
         fancy_feature_label: Optional[str] = None,
         bins: int = 20,
         xlims: Optional[Tuple[float, float]] = None,
-        n_bootstrap: int = 10,
+        n_bootstrap: int = 1,
         confidence: float = 0.95,
         show_errorbar: bool = True,
         show_combinatoric: bool = True,
@@ -789,7 +782,6 @@ class ReconstructionEvaluator:
             show_errorbar=show_errorbar,
         )
 
-        # Extract feature data
         feature_data = FeatureExtractor.extract_feature(
             self.X_test,
             self.config.feature_indices,
@@ -797,15 +789,12 @@ class ReconstructionEvaluator:
             feature_name,
         )
 
-        # Create bins
         bin_edges = BinningUtility.create_bins(feature_data, bins, xlims)
         binning_mask = BinningUtility.create_binning_mask(feature_data, bin_edges)
         bin_centers = BinningUtility.compute_bin_centers(bin_edges)
 
-        # Get event weights
         event_weights = FeatureExtractor.get_event_weights(self.X_test)
 
-        # Compute combinatoric baseline if requested
         combinatoric_accuracy = None
         if show_combinatoric:
             combinatoric_per_event = (
@@ -817,11 +806,10 @@ class ReconstructionEvaluator:
                 binning_mask, combinatoric_per_event, event_weights
             )
 
-        # Compute binned accuracies for each reconstructor
         print(f"\nComputing binned accuracy for {feature_name}...")
         binned_accuracies = []
         names = []
-        for i, reconstructor in enumerate(self.reconstructors):
+        for i, reconstructor in enumerate(self.prediction_manager.reconstructors):
             if isinstance(reconstructor, GroundTruthReconstructor):
                 continue
             accuracy_data = self.evaluate_selection_accuracy(i, per_event=True)
@@ -841,12 +829,11 @@ class ReconstructionEvaluator:
                 )
                 binned_accuracies.append((binned_acc, binned_acc, binned_acc))
             names.append(reconstructor.get_assignment_name())
-        # Compute bin counts
+
         bin_counts = np.sum(
             event_weights.reshape(1, -1) * binning_mask, axis=1
         ) / np.sum(event_weights)
 
-        # Plot
         feature_label = fancy_feature_label or feature_name
 
         return SelectionAccuracyPlotter.plot_binned_selection_accuracy(
@@ -869,20 +856,20 @@ class ReconstructionEvaluator:
         """Plot confusion matrices for all reconstructors."""
         predictions_list = [
             self.prediction_manager.get_assignment_predictions(i)
-            for i in range(len(self.reconstructors))
+            for i in range(len(self.prediction_manager.reconstructors))
             if not isinstance(
-                self.reconstructors[i],
+                self.prediction_manager.reconstructors[i],
                 GroundTruthReconstructor,
             )
         ]
         names = [
             r.get_assignment_name()
-            for r in self.reconstructors
+            for r in self.prediction_manager.reconstructors
             if not isinstance(r, GroundTruthReconstructor)
         ]
 
         return ConfusionMatrixPlotter.plot_confusion_matrices(
-            self.y_test["assignment_labels"],
+            self.y_test["assignment"],
             predictions_list,
             names,
             normalize,
@@ -893,83 +880,29 @@ class ReconstructionEvaluator:
 
     def compute_complementarity_matrix(self) -> np.ndarray:
         """Compute complementarity matrix between reconstructors."""
-        return self.complementarity_analyzer.compute_complementarity_matrix()
+        return ComplementarityAnalyzer.compute_complementarity_matrix()
 
     def plot_complementarity_matrix(
         self,
         figsize: Tuple[int, int] = (8, 6),
     ):
+        fig, ax = plt.subplots(figsize=figsize)
         """Plot complementarity matrix between reconstructors."""
         matrix = self.compute_complementarity_matrix()
         names = [
             r.get_assignment_name()
-            for r in self.reconstructors
+            for r in self.prediction_manager.reconstructors
             if not isinstance(r, GroundTruthReconstructor)
         ]
-        return ComplementarityPlotter.plot_complementarity_matrix(
-            matrix, names, figsize
-        )
-
-    def plot_binned_complementarity(
-        self,
-        feature_data_type: str,
-        feature_name: str,
-        fancy_feature_label: Optional[str] = None,
-        bins: int = 20,
-        xlims: Optional[Tuple[float, float]] = None,
-        n_bootstrap: int = 10,
-        confidence: float = 0.95,
-        show_errorbar: bool = True,
-    ):
-        """Plot binned complementarity vs. a feature."""
-        config = PlotConfig(
-            confidence=confidence,
-            n_bootstrap=n_bootstrap,
-            show_errorbar=show_errorbar,
-        )
-
-        # Extract feature data
-        feature_data = FeatureExtractor.extract_feature(
-            self.X_test,
-            self.config.feature_indices,
-            feature_data_type,
-            feature_name,
-        )
-
-        # Create bins
-        bin_edges = BinningUtility.create_bins(feature_data, bins, xlims)
-        binning_mask = BinningUtility.create_binning_mask(feature_data, bin_edges)
-        bin_centers = BinningUtility.compute_bin_centers(bin_edges)
-
-        # Get event weights and complementarity
-        event_weights = FeatureExtractor.get_event_weights(self.X_test)
-        per_event_comp = self.complementarity_analyzer.get_per_event_complementarity()
-
-        # Compute binned complementarity
-        print(f"\nComputing binned complementarity for {feature_name}...")
-        if show_errorbar:
-            binned_comp = BootstrapCalculator.compute_binned_bootstrap(
-                binning_mask,
-                event_weights,
-                per_event_comp,
-                config.n_bootstrap,
-                config.confidence,
-            )
-        else:
-            binned_comp_mean = BinningUtility.compute_weighted_binned_statistic(
-                binning_mask, per_event_comp, event_weights
-            )
-            binned_comp = (binned_comp_mean, binned_comp_mean, binned_comp_mean)
-
-        # Compute bin counts
-        bin_counts = np.sum(
-            event_weights.reshape(1, -1) * binning_mask, axis=1
-        ) / np.sum(event_weights)
-
-        # Plot
-        feature_label = fancy_feature_label or feature_name
-        return ComplementarityPlotter.plot_binned_complementarity(
-            bin_centers, binned_comp, bin_counts, bin_edges, feature_label, config
+        return sns.heatmap(
+            matrix,
+            annot=True,
+            fmt=".2f",
+            xticklabels=names,
+            yticklabels=names,
+            cmap="viridis",
+            cbar_kws={"label": "Complementarity"},
+            ax=ax,
         )
 
     def plot_binned_reco_resolution(
@@ -981,12 +914,12 @@ class ReconstructionEvaluator:
         fancy_feature_label: Optional[str] = None,
         bins: int = 20,
         xlims: Optional[Tuple[float, float]] = None,
-        n_bootstrap: int = 10,
+        n_bootstrap: int = 1,
         confidence: float = 0.95,
         show_errorbar: bool = True,
         statistic: str = "std",
-        use_signed_deviation: bool = False,
-        use_relative_deviation: bool = True,
+        use_signed_deviation: bool = True,
+        use_relative_deviation: bool = False,
         combine_tops: bool = False,
     ):
         """
@@ -1035,7 +968,7 @@ class ReconstructionEvaluator:
         print(f"\nComputing binned {ylabel} for {feature_name}...")
         binned_metrics = []
 
-        for i, reconstructor in enumerate(self.reconstructors):
+        for i, reconstructor in enumerate(self.prediction_manager.reconstructors):
             # Compute reconstructed and truth values
             reconstructed = self.variable_handler.compute_reconstructed_variable(
                 i, variable_name
@@ -1086,7 +1019,7 @@ class ReconstructionEvaluator:
 
         # Plot
         feature_label = fancy_feature_label or feature_name
-        names = [r.get_full_reco_name() for r in self.reconstructors]
+        names = [r.get_full_reco_name() for r in self.prediction_manager.reconstructors]
 
         return ResolutionPlotter.plot_binned_resolution(
             bin_centers,
@@ -1134,8 +1067,6 @@ class ReconstructionEvaluator:
         event_weights = FeatureExtractor.get_event_weights(self.X_test)
 
         if combine_tops:
-            reconstructed = np.concatenate(reconstructed)
-            truth = np.concatenate(truth)
             event_weights = np.concatenate([event_weights, event_weights])
         return DistributionPlotter.plot_feature_distributions(
             [reconstructed, truth],
@@ -1147,50 +1078,14 @@ class ReconstructionEvaluator:
             ax=ax,
         )
 
-    def plot_deviations_distributions(
-        self,
-        ax,
-        reconstructor_index: int,
-        variable_name: str,
-        variable_label: str,
-        use_relative_deviation: bool = True,
-        use_signed_deviation: bool = True,
-        combine_tops: bool = False,
-        **kwargs,
-    ):
-        """Plot distribution of deviations between reconstructed variable and truth."""
-        # Compute reconstructed and truth values
-        reconstructed = self.variable_handler.compute_reconstructed_variable(
-            reconstructor_index, variable_name
-        )
-        truth = self.variable_handler.compute_true_variable(variable_name)
-        event_weights = FeatureExtractor.get_event_weights(self.X_test)
-
-        # Compute deviation
-        deviation = ResolutionCalculator.compute_deviation(
-            reconstructed,
-            truth,
-            use_signed_deviation=use_signed_deviation,
-            use_relative_deviation=use_relative_deviation,
-        )
-        if combine_tops:
-            deviation = np.concatenate(deviation)
-            event_weights = np.concatenate([event_weights, event_weights])
-
-        return DistributionPlotter.plot_feature_distributions(
-            [deviation],
-            f"Deviation in {variable_label}",
-            event_weights=event_weights,
-            labels=[self.reconstructors[reconstructor_index].get_full_reco_name()],
-            ax=ax,
-            **kwargs,
-        )
-
     def plot_deviations_distributions_all_reconstructors(
         self,
         variable_name: str,
         variable_label: str,
         figsize: Optional[Tuple[int, int]] = (10, 10),
+        use_signed_deviation: bool = True,
+        use_relative_deviation: bool = False,
+        deviation_function: Optional[Callable] = None,
         **kwargs,
     ):
         """
@@ -1216,11 +1111,11 @@ class ReconstructionEvaluator:
         event_weights = FeatureExtractor.get_event_weights(self.X_test)
 
         # Extract common parameters from kwargs
-        use_relative_deviation = kwargs.pop("use_relative_deviation", True)
-        use_signed_deviation = kwargs.pop("use_signed_deviation", True)
         combine_tops = kwargs.pop("combine_tops", False)
 
-        for reco_index, reconstructor in enumerate(self.reconstructors):
+        for reco_index, reconstructor in enumerate(
+            self.prediction_manager.reconstructors
+        ):
 
             # Compute reconstructed and truth values
             reconstructed = self.variable_handler.compute_reconstructed_variable(
@@ -1234,6 +1129,7 @@ class ReconstructionEvaluator:
                 truth,
                 use_signed_deviation=use_signed_deviation,
                 use_relative_deviation=use_relative_deviation,
+                deviation_function=deviation_function,
             )
 
             all_deviations.append(deviation)
@@ -1248,7 +1144,7 @@ class ReconstructionEvaluator:
         # Plot all deviations together
         DistributionPlotter.plot_feature_distributions(
             all_deviations,
-            f"Deviation in {variable_label}",
+            f"{variable_label}",
             event_weights=event_weights_plot,
             labels=labels,
             ax=axes,
@@ -1265,7 +1161,7 @@ class ReconstructionEvaluator:
         variable_label: str,
         xlims: Optional[Tuple[float, float]] = None,
         bins: int = 50,
-        figsize: Optional[Tuple[int, int]] = (10, 10),
+        figsize: Optional[Tuple[int, int]] = (6, 5),
         save_individual_plots: bool = False,
         **kwargs,
     ):
@@ -1283,7 +1179,7 @@ class ReconstructionEvaluator:
         Returns:
             Tuple of (figure, axes)
         """
-        num_plots = len(self.reconstructors)  # Exclude ground truth
+        num_plots = len(self.prediction_manager.reconstructors)  # Exclude ground truth
 
         num_cols = np.ceil(np.sqrt(num_plots)).astype(int)
         num_rows = np.ceil(num_plots / num_cols).astype(int)
@@ -1292,7 +1188,7 @@ class ReconstructionEvaluator:
             fig, axes = plt.subplots(
                 num_rows,
                 num_cols,
-                figsize=figsize,
+                figsize=(figsize[0] * num_cols, figsize[1] * num_rows),
                 constrained_layout=True,
             )
             if isinstance(axes, np.ndarray):
@@ -1309,7 +1205,9 @@ class ReconstructionEvaluator:
                 fig.append(fig_i)
                 axes.append(ax_i)
 
-        for reco_index, reconstructor in enumerate(self.reconstructors):
+        for reco_index, reconstructor in enumerate(
+            self.prediction_manager.reconstructors
+        ):
             #            if isinstance(reconstructor, GroundTruthReconstructor):
             #                continue
             ax = axes[reco_index]
@@ -1325,7 +1223,7 @@ class ReconstructionEvaluator:
             ax.set_title(reconstructor.get_full_reco_name())
 
         if not save_individual_plots:
-            for i in range(len(self.reconstructors), len(axes)):
+            for i in range(len(self.prediction_manager.reconstructors), len(axes)):
                 fig.delaxes(axes[i])  # Remove unused subplots
 
         return fig, axes
@@ -1335,6 +1233,7 @@ class ReconstructionEvaluator:
     def plot_variable_distribution(self, variable_key: str, **kwargs):
         """Generic method to plot variable distributions using configuration."""
         config = self.variable_configs[variable_key]
+
         return self.plot_distributions_all_reconstructors(
             variable_key,
             variable_label=config["label"],
@@ -1351,12 +1250,23 @@ class ReconstructionEvaluator:
         defaults = {
             "use_relative_deviation": config.get("use_relative_deviation", False),
             "combine_tops": config.get("combine_tops", False),
+            "deviation_function": config.get("deviation_function", None),
         }
+        if "deviation_label" in config:
+            variable_label = config["deviation_label"]
+        else:
+            label = config["label"]
+            variable_label = (
+                f"Relative Deviation in {label}"
+                if config["use_relative_deviation"]
+                else f"Deviation in {label}"
+            )
+
         defaults.update(kwargs)
 
         return self.plot_deviations_distributions_all_reconstructors(
             variable_name=variable_key,
-            variable_label=f"{config['label']}",
+            variable_label=variable_label,
             **defaults,
         )
 
@@ -1391,7 +1301,7 @@ class ReconstructionEvaluator:
         names = []
         truth = self.variable_handler.compute_true_variable(variable_name)
         reconstructed_list = []
-        for i, reconstructor in enumerate(self.reconstructors):
+        for i, reconstructor in enumerate(self.prediction_manager.reconstructors):
             if (
                 isinstance(reconstructor, GroundTruthReconstructor)
                 and not reconstructor.use_nu_flows
@@ -1416,7 +1326,7 @@ class ReconstructionEvaluator:
             xlims[1],
             bins + 1,
         )
-        num_plots = len(self.reconstructors)  # Exclude ground truth
+        num_plots = len(self.prediction_manager.reconstructors)  # Exclude ground truth
         num_cols = np.ceil(np.sqrt(num_plots)).astype(int)
         num_rows = np.ceil(num_plots / num_cols).astype(int)
         fig, axes = plt.subplots(
@@ -1429,7 +1339,7 @@ class ReconstructionEvaluator:
             axes = axes.flatten()
         else:
             axes = [axes]
-        
+
         for reco_index, reconstructed, name in zip(
             range(len(reconstructed_list)), reconstructed_list, names
         ):
@@ -1516,7 +1426,7 @@ class ReconstructionEvaluator:
 
     def save_accuracy_latex_table(
         self,
-        n_bootstrap: int = 10,
+        n_bootstrap: int = 1,
         confidence: float = 0.95,
         save_dir: Optional[str] = None,
     ) -> str:
@@ -1539,7 +1449,7 @@ class ReconstructionEvaluator:
 
         # Collect results
         results = []
-        for i, reconstructor in enumerate(self.reconstructors):
+        for i, reconstructor in enumerate(self.prediction_manager.reconstructors):
             if isinstance(reconstructor, GroundTruthReconstructor):
                 continue
 
@@ -1612,7 +1522,7 @@ class ReconstructionEvaluator:
         fancy_feature_label: Optional[str] = None,
         bins: int = 20,
         xlims: Optional[Tuple[float, float]] = None,
-        n_bootstrap: int = 10,
+        n_bootstrap: int = 1,
         confidence: float = 0.95,
     ):
         """
@@ -1661,7 +1571,7 @@ class ReconstructionEvaluator:
         binned_quotients = []
         names = []
 
-        for i, reconstructor in enumerate(self.reconstructors):
+        for i, reconstructor in enumerate(self.prediction_manager.reconstructors):
             if isinstance(reconstructor, GroundTruthReconstructor):
                 continue
 
@@ -1735,48 +1645,24 @@ class ReconstructionEvaluator:
         :param bins: Number of bins
         :param xlims: Optional x-axis limits
         """
-        true_neutrino = self.y_test["neutrino_truth"]
+        true_neutrino = self.y_test["regression"]
         event_weights = FeatureExtractor.get_event_weights(self.X_test)
         neutrino_deviations = []
         names = []
         nu_flows = False
-        for i, reconstructor in enumerate(self.reconstructors):
-            if isinstance(reconstructor, GroundTruthReconstructor) and not reconstructor.use_nu_flows and not reconstructor.perform_regression:
-                continue
-            if (
-                reconstructor.use_nu_flows
-                and not nu_flows
-                and not isinstance(
-                    reconstructor, CompositeNeutrinoComponentReconstructor
-                )
-            ):
-                nu_flows = True
-                names.append(r"$\nu^2$-Flows")
-                pred_neutrino = self.prediction_manager.get_neutrino_predictions(i)
-
-            elif (
-                reconstructor.use_nu_flows
-                and nu_flows
-                and not isinstance(
-                    reconstructor, CompositeNeutrinoComponentReconstructor
-                )
-            ):
-                continue
-            else:
-                names.append(reconstructor.get_full_reco_name())
-                pred_neutrino = self.prediction_manager.get_neutrino_predictions(i)
-
+        for i, reconstructor in enumerate(self.prediction_manager.reconstructors):
+            names.append(reconstructor.get_full_reco_name())
+            pred_neutrino = self.prediction_manager.get_neutrino_predictions(i)
 
             if coords == "spherical":
                 true_neutrino_mag = np.linalg.norm(true_neutrino[..., :3], axis=-1)
                 pred_neutrino_mag = np.linalg.norm(pred_neutrino[..., :3], axis=-1)
-                # Compute deviations
+
                 mag_deviation = (
                     pred_neutrino_mag - true_neutrino_mag
                 ) / true_neutrino_mag
 
-
-                mag_product = true_neutrino_mag*pred_neutrino_mag
+                mag_product = true_neutrino_mag * pred_neutrino_mag
 
                 dir_deviation = np.arccos(
                     np.clip(
@@ -1786,10 +1672,8 @@ class ReconstructionEvaluator:
                             ),
                             mag_product,
                             out=np.zeros_like(true_neutrino_mag),
-                            where=(
-                                (mag_product)
-                                != 0 )  & ( ~np.isnan(mag_product) & ~np.isinf(mag_product)
-                            ),
+                            where=((mag_product) != 0)
+                            & (~np.isnan(mag_product) & ~np.isinf(mag_product)),
                         ),
                         -1.0,
                         1.0,
@@ -1804,20 +1688,71 @@ class ReconstructionEvaluator:
                     np.array([x_deviation, y_deviation, z_deviation])
                 )
             elif coords == "spherical_lepton_fixed":
-                lepton_features = self.X_test["lepton"]
+                lepton_features = self.X_test["lep_inputs"]
                 lepton_3vect = lorentz_vector_from_PtEtaPhiE_array(
-                    lepton_features[..., :4])[..., :3]
-                
-                true_neutrino_z = 
+                    lepton_features[..., :4]
+                )[..., :3]
 
+                true_neutrino_z = project_vectors_onto_axis(
+                    true_neutrino[..., :3], lepton_3vect
+                )
+                pred_neutrino_z = project_vectors_onto_axis(
+                    pred_neutrino[..., :3], lepton_3vect
+                )
 
-
-
+                z_deviation = (pred_neutrino_z - true_neutrino_z) / 1e3
+                true_neutrino_perp = true_neutrino[..., :3] - np.expand_dims(
+                    true_neutrino_z, axis=-1
+                ) * (
+                    lepton_3vect / np.linalg.norm(lepton_3vect, axis=-1, keepdims=True)
+                )
+                pred_neutrino_perp = pred_neutrino[..., :3] - np.expand_dims(
+                    pred_neutrino_z, axis=-1
+                ) * (
+                    lepton_3vect / np.linalg.norm(lepton_3vect, axis=-1, keepdims=True)
+                )
+                true_neutrino_perp_mag = np.linalg.norm(true_neutrino_perp, axis=-1)
+                pred_neutrino_perp_mag = np.linalg.norm(pred_neutrino_perp, axis=-1)
+                perp_mag_deviation = np.divide(
+                    pred_neutrino_perp_mag - true_neutrino_perp_mag,
+                    true_neutrino_perp_mag,
+                    out=np.zeros_like(true_neutrino_perp_mag),
+                    where=true_neutrino_perp_mag != 0,
+                )
+                perp_dot_product = np.sum(
+                    true_neutrino_perp * pred_neutrino_perp, axis=-1
+                )
+                perp_mag_product = true_neutrino_perp_mag * pred_neutrino_perp_mag
+                perp_angle_deviation = np.arccos(
+                    np.clip(
+                        np.divide(
+                            perp_dot_product,
+                            perp_mag_product,
+                            out=np.zeros_like(true_neutrino_perp_mag),
+                            where=(perp_mag_product != 0)
+                            & (
+                                ~np.isnan(perp_mag_product)
+                                & ~np.isinf(perp_mag_product)
+                            ),
+                        ),
+                        -1.0,
+                        1.0,
+                    )
+                )
+                neutrino_deviations.append(
+                    np.array([perp_mag_deviation, perp_angle_deviation, z_deviation])
+                )
 
         if coords == "spherical":
             component_labels = [
                 r"$\Delta |\vec{p}| / |\vec{p}_{\text{true}}|$",
                 r"$\Delta \phi$",
+            ]
+        elif coords == "spherical_lepton_fixed":
+            component_labels = [
+                r"$\Delta |\vec{p}_{\perp}| / |\vec{p}_{\perp, \text{true}}|$",
+                r"$\Delta \phi_{\perp}$",
+                r"$\Delta p_{z}$ [GeV]",
             ]
         elif coords == "cartesian":
             component_labels = [
@@ -1827,7 +1762,7 @@ class ReconstructionEvaluator:
             ]
 
         fig, ax = plt.subplots(
-            figsize=(5 * len(component_labels), 5 * self.config.NUM_LEPTONS),
+            figsize=(6 * len(component_labels), 5 * self.config.NUM_LEPTONS),
             ncols=len(component_labels),
             nrows=self.config.NUM_LEPTONS,
         )
@@ -1844,7 +1779,7 @@ class ReconstructionEvaluator:
                     event_weights=event_weights,
                     labels=names,
                     bins=bins,
-                    xlims=xlims,
+                    xlims=xlims[comp_idx] if xlims is not None else None,
                     ax=ax_i,
                 )
 
@@ -1855,6 +1790,7 @@ class ReconstructionEvaluator:
         for lepton_idx in range(self.config.NUM_LEPTONS):
             for comp_idx in range(len(component_labels)):
                 ax[lepton_idx, comp_idx].get_legend().remove()
+                # pass
 
         # Add single legend for the whole figure
         fig.legend(

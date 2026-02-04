@@ -1,9 +1,9 @@
-import keras
-import tensorflow as tf
+import keras as keras
 
+@keras.saving.register_keras_serializable()
 class OutputUpScaleLayer(keras.layers.Layer):
-    def __init__(self, name="OutputUpScaleLayer"):
-        super().__init__(name=name)
+    def __init__(self, name="OutputUpScaleLayer",**kwargs):
+        super().__init__(name=name,**kwargs)
 
     def build(self, input_shape):
         self.std = self.add_weight(
@@ -18,18 +18,24 @@ class OutputUpScaleLayer(keras.layers.Layer):
             trainable=False,
             name="output_mean",
         )
+        super().build(input_shape)
 
     def call(self, inputs):
         return inputs * self.std + self.mean
 
-    def adapt_normalization(self, data):
-        data = tf.convert_to_tensor(data)
-        mean = tf.reduce_mean(data, axis=0)
-        std = tf.math.reduce_std(data, axis=0)
-
-        self.mean.assign(mean)
-        self.std.assign(std)
+    def set_stats(self, mean=None, std=None):
+        if mean is not None:
+            self.mean.assign(mean)
+        if std is not None:
+            self.std.assign(std)
 
     def get_config(self):
         config = super().get_config()
         return config
+    
+    def get_stats(self):
+        return {"mean": self.mean.numpy(), "std": self.std.numpy()}
+    
+    @classmethod
+    def from_config(cls, config):
+        return cls(**config)

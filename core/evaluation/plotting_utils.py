@@ -384,7 +384,7 @@ class ConfusionMatrixPlotter:
     def plot_variable_confusion_matrix(
         true_values: np.ndarray,
         predicted_values: np.ndarray,
-        variable_name: str,
+        variable_label: str,
         axes: plt.Axes,
         bins: np.ndarray,
         normalize: Optional[str] = None,
@@ -434,104 +434,9 @@ class ConfusionMatrixPlotter:
             label=f"Mean Prediction",
             )
 
-        axes.set_title(f"Confusion Matrix for {variable_name}")
-        axes.set_xlabel("Truth")
-        axes.set_ylabel("Prediction")
+        axes.set_xlabel(f"{variable_label} Truth")
+        axes.set_ylabel(f"{variable_label} Prediction")
         axes.get_figure().colorbar(im, ax=axes)
-
-
-class ComplementarityPlotter:
-    """Handles plotting of complementarity metrics."""
-
-    @staticmethod
-    def plot_complementarity_matrix(
-        complementarity_matrix: np.ndarray,
-        reconstructor_names: List[str],
-        figsize: Tuple[int, int] = (8, 6),
-    ):
-        """Plot complementarity matrix between reconstructors."""
-        fig, ax = plt.subplots(figsize=figsize)
-
-        sns.heatmap(
-            complementarity_matrix,
-            annot=True,
-            fmt=".2f",
-            xticklabels=reconstructor_names,
-            yticklabels=reconstructor_names,
-            cmap="viridis",
-            cbar_kws={"label": "Complementarity"},
-            ax=ax,
-        )
-        ax.set_title("Complementarity Matrix between Reconstructors")
-        ax.set_xlabel("")
-        ax.set_ylabel("")
-
-        fig.tight_layout()
-        return fig, ax
-
-    @staticmethod
-    def plot_binned_complementarity(
-        bin_centers: np.ndarray,
-        binned_complementarity: Tuple[np.ndarray, np.ndarray, np.ndarray],
-        bin_counts: np.ndarray,
-        bins: np.ndarray,
-        feature_label: str,
-        config: PlotConfig,
-    ):
-        """Plot binned complementarity vs. a feature."""
-        fig, ax = plt.subplots(figsize=config.figsize)
-
-        mean_comp, lower, upper = binned_complementarity
-
-        if config.show_errorbar:
-            errors_lower = mean_comp - lower
-            errors_upper = upper - mean_comp
-            ax.errorbar(
-                bin_centers,
-                mean_comp,
-                yerr=[errors_lower, errors_upper],
-                fmt="x",
-                label="Complementarity",
-                color="blue",
-                linestyle="None",
-            )
-        else:
-            ax.plot(
-                bin_centers,
-                mean_comp,
-                label="Complementarity",
-                color="blue",
-            )
-
-        # Configure axes
-        ax.set_xlabel(feature_label)
-        ax.set_ylabel("Complementarity")
-        ax.set_ylim(0, 1)
-        ax.set_xlim(bins[0], bins[-1])
-        ax.grid(alpha=config.alpha)
-        ax.legend(loc="best")
-
-        # Add event count histogram
-        ax_twin = ax.twinx()
-        ax_twin.bar(
-            bin_centers,
-            bin_counts,
-            width=(bins[1] - bins[0]),
-            alpha=0.2,
-            color="red",
-            label="Event Count",
-        )
-        ax_twin.set_ylabel("Event Count", color="red")
-        ax_twin.tick_params(axis="y", labelcolor="red")
-
-        # Set title
-        title = f"Complementarity per Bin vs {feature_label}"
-        if config.show_errorbar:
-            title += f" ({config.confidence*100:.0f}% CI)"
-        ax.set_title(title)
-
-        fig.tight_layout()
-        return fig, ax
 
 
 class ResolutionPlotter:

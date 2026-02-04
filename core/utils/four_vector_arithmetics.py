@@ -1,10 +1,11 @@
 import numpy as np
 
-def lorentz_vector_from_pt_eta_phi_e(pt, eta, phi, e, padding_value = -999):
+
+def lorentz_vector_from_pt_eta_phi_e(pt, eta, phi, e, padding_value=-999):
     """
     Computes the four-momentum vector components from pt, eta, phi, and energy.
 
-    Args:   
+    Args:
         pt (np.ndarray): Transverse momentum.
         eta (np.ndarray): Pseudorapidity.
         phi (np.ndarray): Azimuthal angle.
@@ -12,7 +13,12 @@ def lorentz_vector_from_pt_eta_phi_e(pt, eta, phi, e, padding_value = -999):
     Returns:
         tuple: A tuple containing the four-momentum components (px, py, pz, e).
     """
-    mask = (pt == padding_value) | (eta == padding_value) | (phi == padding_value) | (e == padding_value)
+    mask = (
+        (pt == padding_value)
+        | (eta == padding_value)
+        | (phi == padding_value)
+        | (e == padding_value)
+    )
     phi = np.where(mask, 0, phi)
     eta = np.where(mask, 0, eta)
     pt = np.where(mask, 0, pt)
@@ -22,11 +28,12 @@ def lorentz_vector_from_pt_eta_phi_e(pt, eta, phi, e, padding_value = -999):
     pz = np.where(mask, padding_value, pt * np.sinh(eta))
     return px, py, pz, e
 
-def lorentz_vector_array_from_pt_eta_phi_e(pt, eta, phi, e, padding_value = -999):
+
+def lorentz_vector_array_from_pt_eta_phi_e(pt, eta, phi, e, padding_value=-999):
     """
     Computes the four-momentum vector components from pt, eta, phi, and energy.
 
-    Args:   
+    Args:
         pt (np.ndarray): Transverse momentum.
         eta (np.ndarray): Pseudorapidity.
         phi (np.ndarray): Azimuthal angle.
@@ -34,7 +41,12 @@ def lorentz_vector_array_from_pt_eta_phi_e(pt, eta, phi, e, padding_value = -999
     Returns:
         tuple: A tuple containing the four-momentum components (px, py, pz, e).
     """
-    mask = (pt == padding_value) | (eta == padding_value) | (phi == padding_value) | (e == padding_value)
+    mask = (
+        (pt == padding_value)
+        | (eta == padding_value)
+        | (phi == padding_value)
+        | (e == padding_value)
+    )
     phi = np.where(mask, 0, phi)
     eta = np.where(mask, 0, eta)
     pt = np.where(mask, 0, pt)
@@ -45,7 +57,7 @@ def lorentz_vector_array_from_pt_eta_phi_e(pt, eta, phi, e, padding_value = -999
     return np.stack((px, py, pz, e), axis=-1)
 
 
-def compute_mass_from_lorentz_vector(px, py, pz, e, padding_value = -999):
+def compute_mass_from_lorentz_vector(px, py, pz, e, padding_value=-999):
     """
     Computes the invariant mass from four-momentum components.
 
@@ -58,20 +70,28 @@ def compute_mass_from_lorentz_vector(px, py, pz, e, padding_value = -999):
         np.ndarray: The invariant mass.
     """
     # Create mask for padding and invalid values (NaN/inf)
-    mask = (px == padding_value) | (py == padding_value) | (pz == padding_value) | (e == padding_value)
+    mask = (
+        (px == padding_value)
+        | (py == padding_value)
+        | (pz == padding_value)
+        | (e == padding_value)
+    )
     mask = mask | np.isnan(px) | np.isnan(py) | np.isnan(pz) | np.isnan(e)
     mask = mask | np.isinf(px) | np.isinf(py) | np.isinf(pz) | np.isinf(e)
-    
+
     px = np.where(mask, 0, px)
     py = np.where(mask, 0, py)
     pz = np.where(mask, 0, pz)
     e = np.where(mask, 0, e)
-    
+
     mass_squared = np.where(mask, padding_value, e**2 - (px**2 + py**2 + pz**2))
-    mass_squared = np.maximum(mass_squared, 0)  # Prevent negative values due to numerical errors
+    mass_squared = np.maximum(
+        mass_squared, 0
+    )  # Prevent negative values due to numerical errors
     return np.sqrt(mass_squared)
 
-def compute_mass_from_lorentz_vector_array(array, padding_value = -999):
+
+def compute_mass_from_lorentz_vector_array(array, padding_value=-999):
     """
     Computes the invariant mass from an array of four-momentum components.
 
@@ -86,7 +106,8 @@ def compute_mass_from_lorentz_vector_array(array, padding_value = -999):
     e = array[..., 3]
     return compute_mass_from_lorentz_vector(px, py, pz, e, padding_value)
 
-def lorentz_vector_from_PtEtaPhiE_array(array, padding_value = -999):
+
+def lorentz_vector_from_PtEtaPhiE_array(array, padding_value=-999):
     """
     Computes the four-momentum vector components from an array of pt, eta, phi, and energy.
 
@@ -102,7 +123,8 @@ def lorentz_vector_from_PtEtaPhiE_array(array, padding_value = -999):
     px, py, pz, e = lorentz_vector_from_pt_eta_phi_e(pt, eta, phi, e, padding_value)
     return np.stack((px, py, pz, e), axis=-1)
 
-def lorentz_vector_from_neutrino_momenta_array(array, padding_value = -999):
+
+def lorentz_vector_from_neutrino_momenta_array(array, padding_value=-999):
     """
     Computes the four-momentum vector components for neutrinos from an array of (px, py, pz).
 
@@ -114,10 +136,15 @@ def lorentz_vector_from_neutrino_momenta_array(array, padding_value = -999):
     px = array[..., 0]
     py = array[..., 1]
     pz = array[..., 2]
-    e = np.where((px == padding_value) | (py == padding_value) | (pz == padding_value), padding_value, np.sqrt(px**2 + py**2 + pz**2))
+    e = np.where(
+        (px == padding_value) | (py == padding_value) | (pz == padding_value),
+        padding_value,
+        np.sqrt(px**2 + py**2 + pz**2),
+    )
     return np.stack((px, py, pz, e), axis=-1)
 
-def compute_pt_from_lorentz_vector_array(array, padding_value = -999):
+
+def compute_pt_from_lorentz_vector_array(array, padding_value=-999):
     """
     Computes the transverse momentum (pt) from an array of four-momentum components.
 
@@ -133,3 +160,42 @@ def compute_pt_from_lorentz_vector_array(array, padding_value = -999):
     py = np.where(mask, 0, py)
     pt = np.sqrt(px**2 + py**2)
     return np.where(mask, padding_value, pt)
+
+
+def project_vectors_onto_axis(
+    vectors: np.ndarray,
+    axis: np.ndarray,
+) -> np.ndarray:
+    """
+    Project vectors onto a given axis.
+
+    Args:
+        vectors: Array of vectors (n_events, 3)
+        axis: Axis to project onto (3,)
+
+    Returns:
+        Array of projected components (n_events,)
+    """
+    axis_norm = np.linalg.norm(axis)
+    axis_norm = np.clip(axis_norm, 1e-10, None)  # Avoid division by zero
+
+    # Check for finite values
+    valid_axis = np.isfinite(axis_norm) & np.all(np.isfinite(axis))
+    axis_norm = np.where(valid_axis, axis_norm, 1.0)
+
+    unit_axis = axis / axis_norm
+    unit_axis = np.where(valid_axis, unit_axis, 0.0)
+
+    projections = np.sum(vectors * unit_axis, axis=-1)
+
+    # Return 0 for invalid cases
+    projections = np.where(
+        np.isfinite(projections) & ~np.isnan(projections), projections, 0.0
+    )
+    return projections
+
+
+def angle_vectors(a: np.ndarray, b: np.ndarray, axis=-1) -> np.ndarray:
+    unit_a = a / np.linalg(a, axis=axis)
+    unit_b = b / np.linalg(b, axis=axis)
+    return np.arccos(np.clip(np.sum(unit_a * unit_b, axis=axis), -1.0, 1.0))

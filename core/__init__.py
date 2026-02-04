@@ -1,3 +1,4 @@
+from .Configs import DataConfig, LoadConfig
 
 try:
     import tensorflow as tf

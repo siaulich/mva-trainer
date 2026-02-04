@@ -14,7 +14,7 @@ The attention blocks include:
 - point_transformer: A transformer-like architecture for processing point cloud data.
 """
 
-import keras
+import keras as keras
 import tensorflow as tf
 from keras import layers, regularizers
 

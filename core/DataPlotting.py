@@ -60,7 +60,7 @@ class DataPlotter:
         feature_names = []
 
         # Collect all features
-        for feature_type in ["jet", "lepton", "met"]:
+        for feature_type in ["jet_inputs", "lep_inputs", "met_inputs"]:
             for feature_name in self.data_processor.feature_index_dict[feature_type]:
                 feature_data = self.get_feature_data(feature_type, feature_name)
                 if feature_data.shape[-1] > 1:
@@ -156,9 +156,9 @@ class DataPlotter:
         Args:
             feature_function (function): A function that takes jet and lepton feature arrays and computes a relational feature.
         """
-        jet_features = self.get_all_feature_data("jet")
-        lepton_features = self.get_all_feature_data("lepton")
-        labels = self.get_all_feature_data("assignment_labels")
+        jet_features = self.get_all_feature_data("jet_inputs")
+        lepton_features = self.get_all_feature_data("lep_inputs")
+        labels = self.get_all_feature_data("assignment")
 
 
         lepton_extended = np.repeat(

@@ -1,6 +1,6 @@
 import tensorflow as tf
 from keras import layers, Model
-import keras
+import keras as keras
 
 @keras.utils.register_keras_serializable()
 class SplitInputsLayer(layers.Layer):
