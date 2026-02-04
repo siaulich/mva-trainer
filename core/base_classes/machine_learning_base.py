@@ -89,13 +89,18 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
         pass
 
     def prepare_training_data(
-        self, X_train, sample_weights=None, class_weights=None, copy_data=False
+        self, data, sample_weights=None, class_weights=None, copy_data=False
     ):
         self.sample_weights = sample_weights
         self.class_weights = class_weights
-        if copy_data:
-            X_train = deepcopy(X_train)
+        for input_name in self.inputs.keys():
+            if input_name not in data:
+                raise ValueError(f"Input '{input_name}' not found in data dictionary.")
 
+        if copy_data:
+            X_train = {key: deepcopy(data[key]) for key in self.inputs.keys()}
+        else:
+            X_train = {key: data[key] for key in self.inputs.keys()}
         y_train = {}
 
         # Rename targets to match model output names
@@ -256,7 +261,7 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
 
     def train_model(
         self,
-        X_train,
+        data,
         epochs,
         batch_size,
         sample_weights=None,
@@ -271,7 +276,7 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
             )
 
         X_train, y_train, sample_weights = self.prepare_training_data(
-            X_train, sample_weights=sample_weights, copy_data=copy_data
+            data, sample_weights=sample_weights, copy_data=copy_data
         )
         if self.trainable_model is None:
             self.trainable_model = self.model
