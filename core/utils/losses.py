@@ -176,6 +176,7 @@ class RegressionLoss(keras.losses.Loss):
         return config
 
 
+
 @keras.utils.register_keras_serializable()
 class MagnitudeDirectionLoss(keras.losses.Loss):
     """

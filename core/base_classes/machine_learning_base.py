@@ -104,8 +104,8 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
         y_train = {}
 
         # Rename targets to match model output names
-        y_train["assignment"] = X_train["assignment"]
-        y_train["regression"] = X_train["regression"]
+        y_train["assignment"] = data["assignment"]
+        y_train["regression"] = data["regression"]
         if not self.perform_regression:
             y_train.pop("regression")
 
@@ -447,11 +447,12 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
             self.perform_regression
             and "normalized_regression" in self.model.output_names
         ):
-            neutrino_truth_std = np.std(data["regression"], axis=0)
+            # neutrino_truth_std = np.std(data["regression"], axis=0)
             # neutrino_truth_mean = np.mean(data["regression"], axis=0)
             denormalisation_layer = keras.layers.Rescaling(
-                scale=neutrino_truth_std,
+                scale=1e6, # Scale neutrinos to TeV by default
                 # offset=neutrino_truth_mean,
+                # scale = neutrino_truth_std,
                 name="regression",
             )
             self.model = KerasModelWrapper(
