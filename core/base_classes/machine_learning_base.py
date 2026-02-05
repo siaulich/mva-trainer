@@ -171,7 +171,7 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
         print("Added physics-informed loss to the model.")
 
     def _prepare_inputs(
-        self, log_variables=True, compute_HLF=False, use_global_event_features=False
+        self, log_variables=True, compute_HLF=False, use_global_event_features=False, transform_inputs=True
     ):
         jet_inputs = keras.Input(shape=(self.max_jets, self.n_jets), name="jet_inputs")
         lep_inputs = keras.Input(
@@ -214,15 +214,27 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
             )
 
         # Normalize inputs
-        normed_jet_inputs = keras.layers.Normalization(name="jet_input_normalization")(
-            transformed_jet_inputs
-        )
-        normed_lep_inputs = keras.layers.Normalization(name="lep_input_normalization")(
-            transformed_lep_inputs
-        )
-        normed_met_inputs = keras.layers.Normalization(name="met_input_normalization")(
-            transformed_met_inputs
-        )
+        if transform_inputs:
+            normed_jet_inputs = keras.layers.Normalization(name="jet_input_normalization")(
+                transformed_jet_inputs
+            )
+            normed_lep_inputs = keras.layers.Normalization(name="lep_input_normalization")(
+                transformed_lep_inputs
+            )
+            normed_met_inputs = keras.layers.Normalization(name="met_input_normalization")(
+                transformed_met_inputs
+            )
+        else:
+            normed_jet_inputs = keras.layers.Normalization(name="jet_input_normalization")(
+                jet_inputs
+            )
+            normed_lep_inputs = keras.layers.Normalization(name="lep_input_normalization")(
+                lep_inputs
+            )
+            normed_met_inputs = keras.layers.Normalization(name="met_input_normalization")(
+                met_inputs
+            )
+
         if self.config.has_global_event_features and use_global_event_features:
             print("Adding normalization for global event features")
             normed_global_event_inputs = keras.layers.Normalization(

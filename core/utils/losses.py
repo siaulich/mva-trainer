@@ -175,88 +175,51 @@ class RegressionLoss(keras.losses.Loss):
         )
         return config
 
-
 @keras.utils.register_keras_serializable()
 class PtEtaPhiLoss(keras.losses.Loss):
 
-    def __init__(
-        self,
-        w_pt=1.0,
-        w_eta=1.0,
-        w_phi=1.0,
-        w_e=0.0,  # weight for energy loss (if using E instead of pz)
-        name="PtEtaPhi_loss",
-        log_variables=True,
-        **kwargs,
-    ):
+    def __init__(self, w_pt=1.0, w_eta=1.0, w_phi=1.0, w_e=0.0, name="PtEtaPhi_loss", **kwargs):
         super().__init__(name=name, **kwargs)
         self.w_pt = w_pt
         self.w_eta = w_eta
         self.w_phi = w_phi
         self.w_e = w_e
-        self.log_variables = log_variables
+        self.eps = 1e-8
 
-    def call(self, y_true, y_pred, sample_weight=None):
-        y_true = tf.cast(y_true, tf.float32)
-        y_pred = tf.cast(y_pred, tf.float32)
+    def call(self, y_true, y_pred):
+        px_t, py_t, pz_t = y_true[..., 0], y_true[..., 1], y_true[..., 2]
+        px_p, py_p, pz_p = y_pred[..., 0], y_pred[..., 1], y_pred[..., 2]
 
-        px_true, py_true, pz_true = y_true[..., 0], y_true[..., 1], y_true[..., 2]
-        px_pred, py_pred, pz_pred = y_pred[..., 0], y_pred[..., 1], y_pred[..., 2]
+        # norms
+        p_t = tf.sqrt(px_t*px_t + py_t*py_t + pz_t*pz_t + self.eps)
+        p_p = tf.sqrt(px_p*px_p + py_p*py_p + pz_p*pz_p + self.eps)
 
-        pt_true = tf.sqrt(tf.square(px_true) + tf.square(py_true) + 1e-8)
-        pt_pred = tf.sqrt(tf.square(px_pred) + tf.square(py_pred) + 1e-8)
+        pt_t = tf.sqrt(px_t*px_t + py_t*py_t + self.eps)
+        pt_p = tf.sqrt(px_p*px_p + py_p*py_p + self.eps)
 
-        eta_true = tf.asinh(pz_true / (pt_true + 1e-8))
-        eta_pred = tf.asinh(pz_pred / (pt_pred + 1e-8))
+        # -------- Stable pt loss (scale invariant, no log)
+        loss_pt = tf.square((pt_t - pt_p) / (pt_t + pt_p + self.eps))
 
-        e_true = tf.sqrt(tf.square(px_true) + tf.square(py_true) + tf.square(pz_true))
-        e_pred = tf.sqrt(tf.square(px_pred) + tf.square(py_pred) + tf.square(pz_pred))
+        # -------- Stable "eta" loss via z-direction
+        zdir_t = pz_t / p_t
+        zdir_p = pz_p / p_p
+        loss_eta = tf.square(zdir_t - zdir_p)
 
-        transverse_dot = px_true * px_pred + py_true * py_pred
-        pt_product = pt_true * pt_pred + 1e-8
-        cos_delta_phi = tf.clip_by_value(transverse_dot / pt_product, -1.0, 1.0)
+        # -------- Stable phi loss without acos
+        cos_dphi = (px_t*px_p + py_t*py_p) / (pt_t*pt_p + self.eps)
+        loss_phi = 1.0 - cos_dphi  # smooth, bounded
 
-        if self.log_variables:
-            pt_true = tf.math.log(pt_true + 1e-8)
-            pt_pred = tf.math.log(pt_pred + 1e-8)
-            e_true = tf.math.log(e_true + 1e-8)
-            e_pred = tf.math.log(e_pred + 1e-8)
-            delta_pt = pt_true - pt_pred
-            delta_e = e_true - e_pred
-        else:
-            delta_pt = pt_true - pt_pred
-            delta_e = e_true - e_pred
+        # -------- Stable energy / magnitude loss
+        loss_e = tf.square((p_t - p_p) / (p_t + p_p + self.eps))
 
-        delta_eta = eta_true - eta_pred
-        delta_phi = tf.acos(cos_delta_phi)
-    
-        loss_pt = tf.square(delta_pt)
-        loss_eta = tf.square(delta_eta)
-        loss_phi = tf.square(delta_phi)
-        loss_e = tf.square(delta_e)
-        total_loss = (
+        total = (
             self.w_pt * loss_pt
             + self.w_eta * loss_eta
             + self.w_phi * loss_phi
             + self.w_e * loss_e
         )
-        total_loss = tf.reduce_mean(total_loss, axis=-1)  # mean over items
-        if sample_weight is not None:
-            sample_weight = tf.reshape(tf.cast(sample_weight, total_loss.dtype), [-1])
-            total_loss = total_loss * sample_weight
-        return total_loss
 
-    def get_config(self):
-        config = super().get_config()
-        config.update(
-            {
-                "w_pt": self.w_pt,
-                "w_eta": self.w_eta,
-                "w_phi": self.w_phi,
-                "log_pt": self.log_pt,
-            }
-        )
-        return config
+        return tf.reduce_mean(total, axis=-1)
 
 
 def _get_loss(loss_name):

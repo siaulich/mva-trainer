@@ -49,7 +49,7 @@ class InputPtEtaPhiELayer(keras.layers.Layer):
             )
             safe_log_energy = tf.math.log(safe_non_zero_energy)
             safe_log_pt = tf.math.log(safe_non_zero_pt)
-            
+
 
         # Compute Cartesian components
         px = safe_pt * tf.cos(safe_phi)
