@@ -450,7 +450,7 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
             # neutrino_truth_std = np.std(data["regression"], axis=0)
             # neutrino_truth_mean = np.mean(data["regression"], axis=0)
             denormalisation_layer = keras.layers.Rescaling(
-                scale=1e6, # Scale neutrinos to TeV by default
+                scale=1e5, # Scale neutrinos to 100 GeV by default
                 # offset=neutrino_truth_mean,
                 # scale = neutrino_truth_std,
                 name="regression",

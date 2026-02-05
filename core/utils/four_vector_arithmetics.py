@@ -199,3 +199,19 @@ def angle_vectors(a: np.ndarray, b: np.ndarray, axis=-1) -> np.ndarray:
     unit_a = a / np.linalg(a, axis=axis)
     unit_b = b / np.linalg(b, axis=axis)
     return np.arccos(np.clip(np.sum(unit_a * unit_b, axis=axis), -1.0, 1.0))
+
+
+def PtEtaPhi_to_vector3(vector: np.ndarray) -> np.ndarray:
+    pt, eta, phi = vector[..., 0], vector[..., 1], vector[..., 2]
+    px = pt * np.cos(phi)
+    py = pt * np.sin(phi)
+    pz = pt * np.sinh(eta)
+    return np.stack((px, py, pz), axis=-1)
+
+
+def vector3_to_PtEtaPhi(vector: np.ndarray) -> np.ndarray:
+    px, py, pz = vector[..., 0], vector[..., 1], vector[..., 2]
+    pt = np.sqrt(px**2 + py**2)
+    eta = np.arcsinh(pz / np.clip(pt, 1e-10, None))
+    phi = np.arctan2(py, px)
+    return np.stack((pt, eta, phi), axis=-1)
