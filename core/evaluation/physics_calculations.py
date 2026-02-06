@@ -333,3 +333,17 @@ def c_hel(top, tbar, lep_pos, lep_neg):
     u2 = p2 / p2_norm
 
     return np.sum(u1 * u2, axis=1)
+
+
+def c_hel_test(top, tbar, lep_pos, lep_neg):
+    lep_pos_boosted = boost(lep_pos, top)
+    lep_neg_boosted = boost(lep_neg, tbar)
+    p1 = lep_pos_boosted[:, :3]
+    p2 = lep_neg_boosted[:, :3]
+    p1_norm = np.linalg.norm(p1, axis=1, keepdims=True)
+    p1_norm = np.maximum(p1_norm, 1e-10)
+    u1 = p1 / p1_norm
+    p2_norm = np.linalg.norm(p2, axis=1, keepdims=True)
+    p2_norm = np.maximum(p2_norm, 1e-10)
+    u2 = p2 / p2_norm
+    return np.sum(u1 * u2, axis=1)

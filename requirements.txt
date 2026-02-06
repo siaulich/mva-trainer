@@ -4,6 +4,7 @@ keras
 tf2onnx
 onnxruntime
 scikit-learn
+sympy
 matplotlib
 pandas
 uproot

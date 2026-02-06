@@ -127,6 +127,7 @@ class KerasFFRecoBase(EventReconstructorBase, KerasMLWrapper):
         name,
         perform_regression=False,
         use_nu_flows=True,
+        load_model_path=None,
     ):
         super().__init__(
             config=config,
@@ -141,6 +142,8 @@ class KerasFFRecoBase(EventReconstructorBase, KerasMLWrapper):
         )
         self.model: KerasModelWrapper = None
         self.trainable_model: KerasModelWrapper = None
+        if load_model_path is not None:
+            self.load_model(load_model_path)
 
     def _build_model_base(self, jet_assignment_probs, regression_output=None, **kwargs):
         if self.config.has_neutrino_truth and regression_output is not None:
@@ -171,7 +174,9 @@ class KerasFFRecoBase(EventReconstructorBase, KerasMLWrapper):
             )
             self.trainable_model = self.model
 
-    def compile_model(self, loss, optimizer, metrics=None, add_physics_informed_loss=False, **kwargs):
+    def compile_model(
+        self, loss, optimizer, metrics=None, add_physics_informed_loss=False, **kwargs
+    ):
         if self.trainable_model is None:
             raise ValueError(
                 "Model has not been built yet. Call build_model() before compile_model()."
@@ -183,7 +188,9 @@ class KerasFFRecoBase(EventReconstructorBase, KerasMLWrapper):
             )
             if "reco_mass_deviation" not in loss:
                 loss["reco_mass_deviation"] = lambda y_true, y_pred: y_pred
-        self.trainable_model.compile(loss=loss, optimizer=optimizer, metrics=metrics, **kwargs)
+        self.trainable_model.compile(
+            loss=loss, optimizer=optimizer, metrics=metrics, **kwargs
+        )
 
     def generate_one_hot_encoding(self, predictions, exclusive):
         """
@@ -249,13 +256,13 @@ class KerasFFRecoBase(EventReconstructorBase, KerasMLWrapper):
                 "Model not built. Please build the model using build_model() method."
             )
         if self.met_features is not None:
-            predictions = self.model.predict_dict(
-                data, verbose=0, batch_size=2048
-            )["assignment"]
+            predictions = self.model.predict_dict(data, verbose=0, batch_size=2048)[
+                "assignment"
+            ]
         else:
-            predictions = self.model.predict_dict(
-                data, verbose=0, batch_size=2048
-            )["assignment"]
+            predictions = self.model.predict_dict(data, verbose=0, batch_size=2048)[
+                "assignment"
+            ]
         one_hot = self.generate_one_hot_encoding(predictions, exclusive)
         return one_hot
 
@@ -331,7 +338,7 @@ class KerasFFRecoBase(EventReconstructorBase, KerasMLWrapper):
             assignment_predictions = self.generate_one_hot_encoding(
                 predictions["assignment"], exclusive=True
             )
-            neutrino_reconstruction = predictions["regression"] 
+            neutrino_reconstruction = predictions["regression"]
 
             return assignment_predictions, neutrino_reconstruction
         else:
