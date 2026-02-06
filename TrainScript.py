@@ -12,7 +12,6 @@ from copy import deepcopy
 
 from core import keras_models
 from core import utils
-from core import DataConfig, LoadConfig
 
 
 @dataclass
@@ -37,7 +36,6 @@ from core.DataLoader import (
     DataPreprocessor,
     DataConfig,
     LoadConfig,
-    get_load_config_from_yaml,
 )
 
 

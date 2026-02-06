@@ -5,6 +5,7 @@ import keras as keras
 import numpy as np
 import tensorflow as tf
 import tf2onnx
+import onnx
 import os
 from core.components import (
     onnx_support,
@@ -529,9 +530,21 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
 
         # Convert to ONNX
         spec = (tf.TensorSpec((None, flat_input_size), tf.float32, name="flat_input"),)
-        tf2onnx.convert.from_keras(
+        onnx_model,_ = tf2onnx.convert.from_keras(
             wrapped_model,
-            input_signature=spec,
-            output_path=onnx_file_path,
+            input_signature=spec,   
         )
+
+        meta = onnx_model.metadata_props.add()
+        meta.key = "NN_padding_value"
+        meta.value = str(self.padding_value)
+
+        meta = onnx_model.metadata_props.add()
+        meta.key = "NN_max_jets"
+        meta.value = str(self.max_jets)
+
+        # Save ONNX model
+        onnx.save_model(onnx_model, onnx_file_path)
+
+
         print(f"ONNX model saved to {onnx_file_path}")

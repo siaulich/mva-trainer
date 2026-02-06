@@ -807,6 +807,12 @@ class RootPreprocessor:
             "truth_ttbar_mass": truth_ttbar_mass,
             "truth_ttbar_pt": truth_ttbar_pt,
             "truth_tt_boost_parameter": truth_tt_boost_parameter,
+            "truth_ttbar_px": ttbar_px,
+            "truth_ttbar_py": ttbar_py,
+            "truth_ttbar_pz": ttbar_pz,
+            "truth_ttbar_e": ttbar_e,
+            "truth_ttbar_p": ttbar_p,
+
             # Top quark
             "truth_top_mass": truth_top_mass,
             "truth_top_pt": truth_top_pt,
