@@ -1,5 +1,5 @@
 from .ml_evaluator import MLEvaluator, FeatureImportanceCalculator
-from .reconstruction_evaluator import ReconstructionEvaluator
+from .reconstruction_evaluator import ReconstructionPlotter
 from .evaluator_base import (
     PlotConfig,
     BootstrapCalculator,

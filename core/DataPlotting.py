@@ -16,7 +16,7 @@ class DataPlotter:
         os.makedirs(self.plots_dir, exist_ok=True)
 
     def plot_feature_distribution(
-        self, feature_type: str, feature_name: str, bins: int = 50
+        self, feature_type: str, feature_name: str, bins = 50
     ):
         """
         Plots the distribution of a specified feature.

@@ -23,10 +23,9 @@ class TopReconstructor:
         Compute top quark four-vectors from predictions.
 
         Args:
-            assignment_predictions: Predicted jet assignments (n_events, n_leptons, n_jets)
-            neutrino_predictions: Predicted neutrino momenta (n_events, 2, 3)
-            lepton_features: Lepton features (n_events, n_leptons, n_features)
-            jet_features: Jet features (n_events, n_jets, n_features)
+            leptons: Array of shape (N, 2, 4) with lepton four-vectors
+            jets: Array of shape (N, 2, 4) with jet four-vectors
+            neutrinos: Array of shape (N, 2, 3) with neutrino momenta (px, py, pz)
 
         Returns:
             Tuple of (top1_p4, top2_p4) four-vectors
@@ -39,9 +38,9 @@ class TopReconstructor:
 
 
         # Convert to four-vectors
-        reco_jets_p4 = lorentz_vector_from_PtEtaPhiE_array(reco_jets)
-        reco_leptons_p4 = lorentz_vector_from_PtEtaPhiE_array(reco_leptons)
-        reco_neutrinos_p4 = lorentz_vector_from_neutrino_momenta_array(reco_neutrinos)
+        reco_jets_p4 = reco_jets
+        reco_leptons_p4 = reco_leptons
+        reco_neutrinos_p4 = reco_neutrinos
 
         # Compute top four-vectors
         top1_p4 = reco_jets_p4[:, 0] + reco_leptons_p4[:, 0] + reco_neutrinos_p4[:, 0]
@@ -86,7 +85,7 @@ class TopReconstructor:
         """
         ttbar_p4 = top1_p4 + top2_p4
         return compute_mass_from_lorentz_vector_array(ttbar_p4)
-    
+
 class ResolutionCalculator:
     """Calculate mass resolution metrics."""
 

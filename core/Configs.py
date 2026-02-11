@@ -10,7 +10,7 @@ components like ML models.
 from dataclasses import dataclass, field
 from typing import Optional, Dict, List, Tuple
 import numpy as np
-import keras as keras
+import keras
 
 
 @dataclass
@@ -47,7 +47,7 @@ class LoadConfig:
 
     # Optional features
     met_features: Optional[List[str]] = None
-    global_event_features: Optional[List[str]] = None
+    global_event_inputs: Optional[List[str]] = None
     non_training_features: Optional[List[str]] = None
 
     # Regression target features
@@ -87,8 +87,8 @@ class LoadConfig:
             tbar_truth_features=self.tbar_truth_features,
             top_lepton_truth_features=self.top_lepton_truth_features,
             tbar_lepton_truth_features=self.tbar_lepton_truth_features,
-            global_event_features=self.global_event_features,
-            has_global_event_features=self.global_event_features is not None,
+            global_event_inputs=self.global_event_inputs,
+            has_global_event_inputs=self.global_event_inputs is not None,
             has_top_truth=self.top_truth_features is not None,
             has_lepton_truth=self.top_lepton_truth_features is not None,
             has_event_weight=self.event_weight is not None,
@@ -146,8 +146,8 @@ class DataConfig:
     jet_features: List[str]
     lepton_features: List[str]
     met_features: Optional[List[str]] = None
-    global_event_features: Optional[List[str]] = None
-    has_global_event_features: bool = False
+    global_event_inputs: Optional[List[str]] = None
+    has_global_event_inputs: bool = False
 
     # Non-training features
     non_training_features: Optional[List[str]] = None
@@ -221,6 +221,8 @@ class DataConfig:
             self._add_feature_indices(
                 "nu_flows_neutrino_truth", self.nu_flows_neutrino_momentum_features
             )
+        if self.has_global_event_inputs:
+            self._add_feature_indices("global_event_inputs", self.global_event_inputs)
         if self.has_top_truth:
             self._add_feature_indices("top_truth", self.top_truth_features)
         if self.has_lepton_truth:
@@ -245,8 +247,8 @@ class DataConfig:
             ),
             (
                 "global_event_inputs",
-                self.has_global_event_features,
-                self.global_event_features,
+                self.has_global_event_inputs,
+                self.global_event_inputs,
                 (None,),
             ),
             # Truth features (n_events, NUM_LEPTONS, n_features)

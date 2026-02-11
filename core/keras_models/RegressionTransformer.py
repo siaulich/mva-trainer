@@ -35,9 +35,7 @@ class FullRecoTransformer(KerasFFRecoBase):
         num_layers,
         dropout_rate,
         num_heads=8,
-        compute_HLF=False,
-        log_variables=False,
-        use_global_event_features=False,
+        use_global_event_inputs=False,
     ):
         """
         Builds the Assignment Transformer model.
@@ -50,29 +48,13 @@ class FullRecoTransformer(KerasFFRecoBase):
             keras.Model: The constructed Keras model.
         """
         normed_inputs, masks = self._prepare_inputs(
-            compute_HLF=compute_HLF,
-            log_variables=log_variables,
-            use_global_event_features=use_global_event_features,
+            use_global_event_inputs=use_global_event_inputs,
         )
         normed_jet_inputs = normed_inputs["jet_inputs"]
         normed_lep_inputs = normed_inputs["lepton_inputs"]
         normed_met_inputs = normed_inputs["met_inputs"]
         jet_mask = masks["jet_mask"]
 
-        if compute_HLF:
-            normed_HLF_inputs = normed_inputs["hlf_inputs"]
-            flat_normed_HLF_inputs = keras.layers.Reshape((self.max_jets, -1))(
-                normed_HLF_inputs
-            )
-            normed_jet_inputs = keras.layers.Concatenate(axis=-1)(
-                [normed_jet_inputs, flat_normed_HLF_inputs]
-            )
-
-        if self.config.has_global_event_features:
-            normed_global_event_inputs = normed_inputs["global_event_inputs"]
-            raise NotImplementedError(
-                "FeatureConcatTransformer does not support global event features yet."
-            )
 
         # Embed jets
         jet_embeddings = MLP(
@@ -203,7 +185,7 @@ class FeatureConcatTransformerReconstructor(KerasFFRecoBase):
         dropout_rate,
         num_heads=8,
         compute_HLF=True,
-        use_global_event_features=False,
+        use_global_event_inputs=False,
         log_variables=True,
     ):
         """
@@ -220,7 +202,7 @@ class FeatureConcatTransformerReconstructor(KerasFFRecoBase):
         normed_inputs, masks = self._prepare_inputs(
             compute_HLF=compute_HLF,
             log_variables=log_variables,
-            use_global_event_features=use_global_event_features,
+            use_global_event_inputs=use_global_event_inputs,
         )
         normed_jet_inputs = normed_inputs["jet_inputs"]
         normed_lep_inputs = normed_inputs["lepton_inputs"]
@@ -236,7 +218,7 @@ class FeatureConcatTransformerReconstructor(KerasFFRecoBase):
                 [normed_jet_inputs, flat_normed_HLF_inputs]
             )
 
-        if self.config.has_global_event_features:
+        if self.config.has_global_event_inputs:
             normed_global_event_inputs = normed_inputs["global_event_inputs"]
             flatted_global_event_inputs = keras.layers.Flatten()(
                 normed_global_event_inputs

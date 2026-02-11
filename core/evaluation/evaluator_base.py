@@ -24,35 +24,38 @@ class BootstrapCalculator:
         data: np.ndarray,
         n_bootstrap: int = 10,
         confidence: float = 0.95,
-        statistic_fn=np.mean,
-    ) -> Tuple[float, float, float]:
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
         Compute bootstrap confidence intervals for a statistic.
 
         Args:
-            data: Input data array
+            data: Input data array (resampling along first dimension)
             n_bootstrap: Number of bootstrap samples
             confidence: Confidence level for intervals
             statistic_fn: Function to compute statistic (default: mean)
 
         Returns:
             Tuple of (mean_statistic, lower_bound, upper_bound)
+            Each element has the same shape as the statistic result
         """
-        n_samples = len(data)
-        bootstrap_statistics = np.zeros(n_bootstrap)
+        n_samples = data.shape[0]
+
+        # Compute the first statistic to determine its shape
+
+        bootstrap_statistics = np.zeros((n_bootstrap, *data.shape[1:]))
 
         for i in range(n_bootstrap):
             indices = np.random.randint(0, n_samples, size=n_samples)
             bootstrap_sample = data[indices]
-            bootstrap_statistics[i] = statistic_fn(bootstrap_sample)
+            bootstrap_statistics[i] = np.mean(bootstrap_sample, axis=0)
 
-        mean_statistic = np.mean(bootstrap_statistics)
+        mean_statistic = np.mean(bootstrap_statistics, axis=0)
         alpha = 1 - confidence
         lower_percentile = (alpha / 2) * 100
         upper_percentile = (1 - alpha / 2) * 100
 
-        lower_bound = np.percentile(bootstrap_statistics, lower_percentile)
-        upper_bound = np.percentile(bootstrap_statistics, upper_percentile)
+        lower_bound = np.percentile(bootstrap_statistics, lower_percentile, axis=0)
+        upper_bound = np.percentile(bootstrap_statistics, upper_percentile, axis=0)
 
         return mean_statistic, lower_bound, upper_bound
 
@@ -110,7 +113,7 @@ class BootstrapCalculator:
         binning_mask: np.ndarray,
         event_weights: np.ndarray,
         data: Tuple[np.ndarray],
-        function : Callable = np.mean,
+        function: Callable = np.mean,
         n_bootstrap: int = 10,
         confidence: float = 0.95,
         statistic: str = "mean",
@@ -141,9 +144,15 @@ class BootstrapCalculator:
             bootstrap_weights = event_weights[indices]
             bootstrap_mask = binning_mask[:, indices]
 
-            binned_values = tuple(BinningUtility.compute_weighted_binned_statistic(
-                bootstrap_mask, bootstrap_data_i, bootstrap_weights, statistic=statistic
-            ) for bootstrap_data_i in bootstrap_data)
+            binned_values = tuple(
+                BinningUtility.compute_weighted_binned_statistic(
+                    bootstrap_mask,
+                    bootstrap_data_i,
+                    bootstrap_weights,
+                    statistic=statistic,
+                )
+                for bootstrap_data_i in bootstrap_data
+            )
             bootstrap_binned_values[i] = function(*binned_values)
         mean_values = np.mean(bootstrap_binned_values, axis=0)
 
@@ -155,8 +164,6 @@ class BootstrapCalculator:
         upper_bounds = np.percentile(bootstrap_binned_values, upper_percentile, axis=0)
 
         return mean_values, lower_bounds, upper_bounds
-
-
 
 
 class BinningUtility:
@@ -219,11 +226,13 @@ class BinningUtility:
         # Filter out NaN and inf values
         valid_mask = np.isfinite(data)
         data_clean = np.where(valid_mask, data, 0)
-        
+
         # Apply valid mask to binning
         binning_mask_valid = binning_mask & valid_mask.reshape(1, -1)
-        
-        weighted_data = data_clean.reshape(1, -1) * weights.reshape(1, -1) * binning_mask_valid
+
+        weighted_data = (
+            data_clean.reshape(1, -1) * weights.reshape(1, -1) * binning_mask_valid
+        )
         bin_weights = np.sum(weights.reshape(1, -1) * binning_mask_valid, axis=1)
 
         if statistic == "mean":
@@ -241,7 +250,9 @@ class BinningUtility:
                 binning_mask, data, weights, statistic="mean"
             )
             squared_diff = (data_clean.reshape(1, -1) - mean_values.reshape(-1, 1)) ** 2
-            weighted_squared_diff = squared_diff * weights.reshape(1, -1) * binning_mask_valid
+            weighted_squared_diff = (
+                squared_diff * weights.reshape(1, -1) * binning_mask_valid
+            )
             variance = np.divide(
                 np.sum(weighted_squared_diff, axis=1),
                 bin_weights,
@@ -253,8 +264,6 @@ class BinningUtility:
             raise ValueError(f"Unknown statistic: {statistic}")
 
         return result
-    
-
 
 
 class FeatureExtractor:
@@ -310,7 +319,7 @@ class FeatureExtractor:
         """Get event weights from test data."""
         n_events = X_test[list(X_test.keys())[0]].shape[0]
         return X_test.get("event_weight", np.ones(n_events))
-    
+
     @staticmethod
     def get_event_indices(X_test: dict) -> np.ndarray:
         """Get event indices from test data."""
@@ -324,6 +333,7 @@ class FeatureExtractor:
         loaded_event_indices: np.ndarray,
     ) -> dict:
         """Align X_test to loaded event indices."""
+
 
 class AccuracyCalculator:
     """Utilities for computing accuracy metrics."""
@@ -363,9 +373,9 @@ class AccuracyCalculator:
         num_jets = np.all(X_test["jet_inputs"] != padding_value, axis=-1).sum(axis=-1)
         return 1 / (num_jets * (num_jets - 1))
 
+
 class SelectionAccuracyCalculator:
     """Utilities for computing selection accuracy metrics."""
-
 
     @staticmethod
     def compute_combinatoric_baseline(
@@ -396,10 +406,13 @@ class SelectionAccuracyCalculator:
         """
         true_indices = np.argmax(true_labels, axis=-2)
         predicted_indices = np.argmax(predictions, axis=-2)
-        correct_selections = np.all(predicted_indices == true_indices, axis=-1) | np.all(predicted_indices[:, ::-1] == true_indices, axis=-1)
+        correct_selections = np.all(
+            predicted_indices == true_indices, axis=-1
+        ) | np.all(predicted_indices[:, ::-1] == true_indices, axis=-1)
         if per_event:
             return correct_selections.astype(float)
         return np.mean(correct_selections)
+
 
 class NeutrinoDeviationCalculator:
     """Utilities for computing neutrino reconstruction deviation metrics."""
@@ -433,11 +446,11 @@ class NeutrinoDeviationCalculator:
         # Compute L2 norm of the difference for each neutrino
         # Shape: (n_events, 2)
         diff_norm = np.linalg.norm(predicted_neutrinos - true_neutrinos, axis=-1)
-        
+
         # Compute L2 norm of true neutrinos for normalization
         # Shape: (n_events, 2)
         true_norm = np.linalg.norm(true_neutrinos, axis=-1)
-        
+
         # Compute relative deviation per neutrino
         # Shape: (n_events, 2)
         relative_dev = np.divide(
@@ -446,11 +459,11 @@ class NeutrinoDeviationCalculator:
             out=np.zeros_like(diff_norm, dtype=float),
             where=true_norm != 0,
         )
-        
+
         # Average over both neutrinos
         # Shape: (n_events,)
         per_event_deviation = np.mean(relative_dev, axis=-1)
-        
+
         if per_event:
             return per_event_deviation
         return np.mean(per_event_deviation)
@@ -473,9 +486,9 @@ class NeutrinoDeviationCalculator:
             Deviation value(s)
         """
         diff_norm = np.linalg.norm(predicted_neutrinos - true_neutrinos, axis=-1)
-        
+
         per_event_deviation = np.mean(diff_norm, axis=-1)
-        
+
         if per_event:
             return per_event_deviation
         return np.mean(per_event_deviation)

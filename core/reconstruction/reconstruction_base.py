@@ -4,7 +4,12 @@ import numpy as np
 from abc import ABC, abstractmethod
 from core.DataLoader import DataConfig
 from core.base_classes import BaseUtilityModel, KerasMLWrapper, KerasModelWrapper
-from core.components import OutputUpScaleLayer, PhysicsInformedLoss
+from core.components import (
+    OutputUpScaleLayer,
+    PhysicsInformedLoss,
+    ConfidenceLossOutputLayer,
+)
+from core.utils import losses
 
 
 class EventReconstructorBase(BaseUtilityModel, ABC):
@@ -13,13 +18,16 @@ class EventReconstructorBase(BaseUtilityModel, ABC):
         config: DataConfig,
         assignment_name,
         full_reco_name,
+        neutrino_name = None,
         perform_regression=True,
         use_nu_flows=True,
     ):
-        super().__init__(
+        BaseUtilityModel.__init__(
+            self,
             config=config,
             assignment_name=assignment_name,
             full_reco_name=full_reco_name,
+            neutrino_name=neutrino_name,
         )
         self.max_jets = config.max_jets
         self.NUM_LEPTONS = config.NUM_LEPTONS
@@ -140,39 +148,43 @@ class KerasFFRecoBase(EventReconstructorBase, KerasMLWrapper):
             perform_regression=perform_regression,
             use_nu_flows=use_nu_flows,
         )
-        self.model: KerasModelWrapper = None
-        self.trainable_model: KerasModelWrapper = None
+        self.model: keras.models.Model = None
+        self.trainable_model: keras.models.Model = None
         if load_model_path is not None:
             self.load_model(load_model_path)
+        self.predict_confidence = False
 
-    def _build_model_base(self, jet_assignment_probs, regression_output=None, **kwargs):
-        if self.config.has_neutrino_truth and regression_output is not None:
-            self.trainable_model = KerasModelWrapper(
-                inputs=list(self.inputs.values()),
-                outputs={
-                    "assignment": jet_assignment_probs,
-                    "normalized_regression": regression_output,
-                },
-                **kwargs,
-            )
-            self.model = self.trainable_model
+    def _build_model_base(
+        self,
+        jet_assignment_probs,
+        regression_output=None,
+        confidence_score=None,
+        **kwargs,
+    ):
+        trainable_outputs = {}
+        outputs = {}
+        outputs["assignment"] = jet_assignment_probs
+        trainable_outputs["assignment"] = jet_assignment_probs
 
-        else:
-            if self.config.has_neutrino_truth and regression_output is None:
-                print(
-                    "WARNING: Regression targets are specified in the config, but regression_output is None."
-                )
-            if not self.config.has_neutrino_truth and regression_output is not None:
-                print(
-                    "WARNING: Regression targets are not specified in the config, but regression_output is provided. Ignoring regression_output."
-                )
-            print("Building model without regression output.")
-            self.model = KerasModelWrapper(
-                inputs=list(self.inputs.values()),
-                outputs={"assignment": jet_assignment_probs},
-                **kwargs,
-            )
-            self.trainable_model = self.model
+        if self.perform_regression and regression_output is not None:
+            outputs["normalized_regression"] = regression_output
+            trainable_outputs["normalized_regression"] = regression_output
+        if confidence_score is not None:
+            outputs["confidence_score"] = confidence_score
+            trainable_outputs["confidence_loss_output"] = ConfidenceLossOutputLayer(
+                name="confidence_loss_output"
+            )(jet_assignment_probs, confidence_score)
+            self.predict_confidence = True
+        self.model = keras.models.Model(
+            inputs=self.inputs,
+            outputs=outputs,
+            name=kwargs.get("name", "reco_model"),
+        )
+        self.trainable_model = keras.models.Model(
+            inputs=self.inputs,
+            outputs=trainable_outputs,
+            name=kwargs.get("name", "reco_trainable_model"),
+        )
 
     def compile_model(
         self, loss, optimizer, metrics=None, add_physics_informed_loss=False, **kwargs
@@ -181,6 +193,8 @@ class KerasFFRecoBase(EventReconstructorBase, KerasMLWrapper):
             raise ValueError(
                 "Model has not been built yet. Call build_model() before compile_model()."
             )
+        if self.predict_confidence:
+            loss["confidence_loss_output"] = losses.ConfidenceScoreLoss()
         if add_physics_informed_loss:
             self.add_reco_mass_deviation_loss()
             print(
@@ -255,16 +269,8 @@ class KerasFFRecoBase(EventReconstructorBase, KerasMLWrapper):
             raise ValueError(
                 "Model not built. Please build the model using build_model() method."
             )
-        if self.met_features is not None:
-            predictions = self.model.predict_dict(data, verbose=0, batch_size=2048)[
-                "assignment"
-            ]
-        else:
-            predictions = self.model.predict_dict(data, verbose=0, batch_size=2048)[
-                "assignment"
-            ]
-        one_hot = self.generate_one_hot_encoding(predictions, exclusive)
-        return one_hot
+
+        return self.complete_forward_pass(data)[0]
 
     def reconstruct_neutrinos(self, data: dict[str : np.ndarray]):
         """
@@ -287,22 +293,26 @@ class KerasFFRecoBase(EventReconstructorBase, KerasMLWrapper):
                 "Model not built. Please build the model using build_model() method."
             )
 
-        if "regression" in self.model.output_names and self.perform_regression:
-            if self.met_features is not None:
-                neutrino_prediction = self.model.predict_dict(
-                    [data["jet_inputs"], data["lep_inputs"], data["met_inputs"]],
-                    verbose=0,
-                    batch_size=2048,
-                )["regression"]
+        return self.complete_forward_pass(data)[1]
+    
+    def predict(self, data: dict[str : np.ndarray], batch_size=2048, verbose=0):
+        inputs = {}
+        for key in self.model.input:
+            if hasattr(key, "name"):
+                input_name = key.name.split(":")[0]
+            elif isinstance(key, str):
+                input_name = key
             else:
-                neutrino_prediction = self.model.predict_dict(
-                    [data["jet_inputs"], data["lep_inputs"]], verbose=0, batch_size=2048
-                )["regression"]
-            return neutrino_prediction
-        else:
-            return super().reconstruct_neutrinos(data)
+                raise ValueError(f"Unexpected input key type: {type(key)}. Expected a Keras tensor or string.")
+            if input_name in data:
+                inputs[input_name] = data[input_name]
+            else:
+                raise ValueError(f"Expected input '{input_name}' not found in data dictionary.")
+        predictions = self.model.predict(inputs, batch_size=batch_size, verbose=verbose)
+        return predictions
 
-    def complete_forward_pass(self, data: dict[str : np.ndarray], return_probs=False):
+
+    def complete_forward_pass(self, data: dict[str : np.ndarray]):
         """
         Performs a complete forward pass through the model, returning both
         jet-lepton assignment predictions and neutrino kinematics reconstruction.
@@ -323,28 +333,17 @@ class KerasFFRecoBase(EventReconstructorBase, KerasMLWrapper):
             raise ValueError(
                 "Model not built. Please build the model using build_model() method."
             )
-
-        if self.perform_regression:
-            if self.met_features is not None:
-                predictions = self.model.predict_dict(
-                    [data["jet_inputs"], data["lep_inputs"], data["met_inputs"]],
-                    verbose=0,
-                    batch_size=2048,
-                )
-            else:
-                predictions = self.model.predict_dict(
-                    [data["jet_inputs"], data["lep_inputs"]], verbose=0, batch_size=2048
-                )
-            assignment_predictions = self.generate_one_hot_encoding(
-                predictions["assignment"], exclusive=True
-            )
+        predictions = self.predict(data)
+        assignment_predictions = self.generate_one_hot_encoding(
+            predictions["assignment"], exclusive=True
+        )
+        if "regression" in predictions:
             neutrino_reconstruction = predictions["regression"]
-
-            return assignment_predictions, neutrino_reconstruction
         else:
-            assignment_predictions = self.predict_indices(data, exclusive=True)
-            neutrino_reconstruction = self.reconstruct_neutrinos(data)
-            return assignment_predictions, neutrino_reconstruction
+            neutrino_reconstruction = EventReconstructorBase.reconstruct_neutrinos(
+                self, data
+            )
+        return assignment_predictions, neutrino_reconstruction
 
     def evaluate(self, data_dict):
         assignment_predictions, regression_predictions = self.complete_forward_pass(

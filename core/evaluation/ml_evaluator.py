@@ -31,7 +31,7 @@ class FeatureImportanceCalculator:
         self.X_test = X_test
         self.y_test = y_test
         self.config = reconstructor.config
-        self.padding_value = reconstructor.padding_value
+        self.padding_value = self.config.padding_value
 
     def compute_permutation_importance(
         self, num_repeats: int = 5, evaluate_regression=False
@@ -79,7 +79,7 @@ class FeatureImportanceCalculator:
         regression_importances = {}
 
         # Compute importance for each available feature type
-        available_feature_types = ["jet_inputs", "lep_inputs", "met_inputs"]
+        available_feature_types = ["jet_inputs", "lep_inputs", "met_inputs", "global_event_inputs"]
 
         for feature_type in available_feature_types:
             # Check if this feature type is available in both config and test data
@@ -133,10 +133,15 @@ class FeatureImportanceCalculator:
                     X_permuted["jet_inputs"][mask, feature_idx] = np.random.permutation(
                         X_permuted["jet_inputs"][mask, feature_idx]
                     )
-                else:
+                elif X_permuted[feature_type].ndim == 3:
                     # Permute lepton/MET features directly
                     X_permuted[feature_type][:, :, feature_idx] = np.random.permutation(
                         X_permuted[feature_type][:, :, feature_idx]
+                    )
+                else:
+                    # Permute global event features directly
+                    X_permuted[feature_type][:, feature_idx] = np.random.permutation(
+                        X_permuted[feature_type][:, feature_idx]
                     )
 
                 permutated_assignment_pred, permutated_regression_pred = (
@@ -187,15 +192,9 @@ class MLEvaluator:
 
 
         # Store configuration from first reconstructor (for backward compatibility)
-        first_reconstructor = self.reconstructors[0]
-        self.NUM_LEPTONS = first_reconstructor.NUM_LEPTONS
-        self.max_jets = first_reconstructor.max_jets
-        self.met_features = first_reconstructor.met_features
-        self.n_jets = first_reconstructor.n_jets
-        self.n_leptons = first_reconstructor.n_leptons
-        self.n_met = first_reconstructor.n_met
+        first_reconstructor = self.reconstructors[0].config
         self.padding_value = first_reconstructor.padding_value
-        self.feature_indices = first_reconstructor.config.feature_indices
+        self.feature_indices = first_reconstructor.feature_indices
 
         # Initialize helper classes for each reconstructor (with filtered features)
         self.feature_importance_calcs = [
@@ -220,10 +219,6 @@ class MLEvaluator:
                     "Please train the model before plotting history."
                 )
 
-        # Check if any model has regression metrics
-        has_regression = any(
-            "regression_loss" in rec.history.history for rec in self.reconstructors
-        )
 
         # Adjust subplot layout based on whether regression metrics exist
 
@@ -333,7 +328,7 @@ class MLEvaluator:
                 model_name = reconstructor.get_full_reco_name()
             # Get available features for this model
             available_features = []
-            for feature_type in ["jet_inputs", "lep_inputs", "met_inputs"]:
+            for feature_type in ["jet_inputs", "lep_inputs", "met_inputs", "global_event_inputs"]:
                 if (
                     hasattr(reconstructor.config, "feature_indices")
                     and feature_type in reconstructor.config.feature_indices
