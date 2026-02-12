@@ -15,7 +15,7 @@ from core.components import (
     ConcatLeptonCharge,
     ExpandJetMask,
     SplitTransformerOutput,
-
+    StopGradientLayer
 )
 
 from core import DataConfig
@@ -164,8 +164,9 @@ class FeatureConcatAssigner(KerasFFRecoBase):
         dropout_rate,
         num_heads=8,
         compute_HLF=True,
-        use_global_event_features=False,
+        use_global_event_inputs=False,
         log_variables=False,
+        predict_confidence=False,
     ):
         """
         Builds the Assignment Transformer model.
@@ -181,7 +182,7 @@ class FeatureConcatAssigner(KerasFFRecoBase):
         normed_inputs, masks = self._prepare_inputs(
             compute_HLF=compute_HLF,
             log_variables=log_variables,
-            use_global_event_features=use_global_event_features,
+            use_global_event_inputs=use_global_event_inputs,
         )
         normed_jet_inputs = normed_inputs["jet_inputs"]
         normed_lep_inputs = normed_inputs["lepton_inputs"]
@@ -197,7 +198,7 @@ class FeatureConcatAssigner(KerasFFRecoBase):
                 [normed_jet_inputs, flat_normed_HLF_inputs]
             )
 
-        if self.config.has_global_event_features:
+        if self.config.has_global_event_inputs:
             normed_global_event_inputs = normed_inputs["global_event_inputs"]
             flatted_global_event_inputs = keras.layers.Flatten()(
                 normed_global_event_inputs
@@ -253,8 +254,29 @@ class FeatureConcatAssigner(KerasFFRecoBase):
         jet_assignment_probs = TemporalSoftmax(axis=1, name="assignment")(
             jet_output_embedding, mask=jet_mask
         )
+
+        confidence_score = None
+        # Confidence score output (optional)
+        if predict_confidence:
+            confidence_extraction = StopGradientLayer(name="confidence_extraction")(jets_transformed)
+            pooling = PoolingAttentionBlock(
+                num_heads=num_heads,
+                num_seeds=1,
+                key_dim=hidden_dim,
+                dropout_rate=dropout_rate,
+                name="confidence_pooling",
+            )(confidence_extraction, mask=jet_mask)
+            confidence_score = MLP(
+                1,
+                num_layers=2,
+                activation="sigmoid",
+                name="confidence_score_mlp",
+            )(pooling)
+            confidence_score = keras.layers.Flatten(name="confidence_score")(confidence_score)
+
+
         self._build_model_base(
-            jet_assignment_probs, name="FeatureConcatTransformerModel"
+            jet_assignment_probs, confidence_score=confidence_score, name="FeatureConcatTransformerModel"
         )
 
 
@@ -269,20 +291,20 @@ class SPANetAssigner(KerasFFRecoBase):
         encoder_layers = 4,
         dropout_rate = 0.1,
         log_variables=False,
-        use_global_event_features=False,
+        use_global_event_inputs=False,
         compute_HLF=True,
     ):
         normed_inputs, masks = self._prepare_inputs(
             compute_HLF=compute_HLF,
             log_variables=log_variables,
-            use_global_event_features=use_global_event_features,
+            use_global_event_inputs=use_global_event_inputs,
         )
         normed_jet_inputs = normed_inputs["jet_inputs"]
         normed_lep_inputs = normed_inputs["lepton_inputs"]
         normed_met_inputs = normed_inputs["met_inputs"]
         jet_mask = masks["jet_mask"]
 
-        if self.config.has_global_event_features:
+        if self.config.has_global_event_inputs:
             normed_global_event_inputs = normed_inputs["global_event_inputs"]
             raise NotImplementedError(
                 "FeatureConcatTransformer does not support global event features yet."

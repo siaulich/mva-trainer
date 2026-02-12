@@ -18,7 +18,7 @@ from .ground_truth_reconstructor import GroundTruthReconstructor, PerfectAssignm
 __all__ = [
     # Main evaluators
     "MLEvaluator",
-    "ReconstructionEvaluator",
+    "ReconstructionPlotter",
     
     # Feature importance
     "FeatureImportanceCalculator",

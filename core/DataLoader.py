@@ -275,9 +275,9 @@ class DataPreprocessor:
 
     def _load_optional_features(self, loaded: Dict) -> None:
         """Load optional features (MET, global, non-training, weights)."""
-        if self.load_config.global_event_features:
+        if self.load_config.global_event_inputs:
             self.feature_data["global_event_inputs"] = self._load_feature_array(
-                loaded, self.load_config.global_event_features
+                loaded, self.load_config.global_event_inputs
             )
 
         if self.load_config.met_features:
@@ -458,8 +458,10 @@ class DataPreprocessor:
             return self.get_event_weight().copy()
         elif data_type == "event_number":
             return self.get_event_number().copy()
+        elif data_type in self.feature_data:
+            return self.feature_data[data_type][..., feature_idx].copy()
         else:
-            raise ValueError(f"Unsupported data type: {data_type}")
+            raise ValueError(f"Data type '{data_type}' not found in feature data")
 
     def get_all_feature_data(self, feature_type: str) -> np.ndarray:
         """Get all features of a given type."""

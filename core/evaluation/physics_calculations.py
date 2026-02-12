@@ -10,83 +10,6 @@ from core.utils import (
 )
 
 
-class TopReconstructor:
-    """Handles reconstruction of top quark kinematics."""
-
-    @staticmethod
-    def compute_top_lorentz_vectors(
-        leptons: np.ndarray,
-        jets: np.ndarray,
-        neutrinos: np.ndarray,
-    ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Compute top quark four-vectors from predictions.
-
-        Args:
-            assignment_predictions: Predicted jet assignments (n_events, n_leptons, n_jets)
-            neutrino_predictions: Predicted neutrino momenta (n_events, 2, 3)
-            lepton_features: Lepton features (n_events, n_leptons, n_features)
-            jet_features: Jet features (n_events, n_jets, n_features)
-
-        Returns:
-            Tuple of (top1_p4, top2_p4) four-vectors
-        """
-
-        # Reshape leptons and neutrinos
-        reco_jets = jets.reshape(-1, 2, 4)
-        reco_leptons = leptons.reshape(-1, 2, 4)
-        reco_neutrinos = neutrinos.reshape(-1, 2, 3)
-
-
-        # Convert to four-vectors
-        reco_jets_p4 = lorentz_vector_from_PtEtaPhiE_array(reco_jets)
-        reco_leptons_p4 = lorentz_vector_from_PtEtaPhiE_array(reco_leptons)
-        reco_neutrinos_p4 = lorentz_vector_from_neutrino_momenta_array(reco_neutrinos)
-
-        # Compute top four-vectors
-        top1_p4 = reco_jets_p4[:, 0] + reco_leptons_p4[:, 0] + reco_neutrinos_p4[:, 0]
-        top2_p4 = reco_jets_p4[:, 1] + reco_leptons_p4[:, 1] + reco_neutrinos_p4[:, 1]
-
-        return top1_p4, top2_p4
-
-
-    @staticmethod
-    def compute_top_masses(
-        top1_p4: np.ndarray,
-        top2_p4: np.ndarray,
-    ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Compute top quark masses from four-vectors.
-
-        Args:
-            top1_p4: Top 1 four-vector
-            top2_p4: Top 2 four-vector
-
-        Returns:
-            Tuple of (top1_mass, top2_mass)
-        """
-        top1_mass = compute_mass_from_lorentz_vector_array(top1_p4)
-        top2_mass = compute_mass_from_lorentz_vector_array(top2_p4)
-        return top1_mass, top2_mass
-
-    @staticmethod
-    def compute_ttbar_mass(
-        top1_p4: np.ndarray,
-        top2_p4: np.ndarray,
-    ) -> np.ndarray:
-        """
-        Compute ttbar system mass.
-
-        Args:
-            top1_p4: Top 1 four-vector
-            top2_p4: Top 2 four-vector
-
-        Returns:
-            ttbar mass array
-        """
-        ttbar_p4 = top1_p4 + top2_p4
-        return compute_mass_from_lorentz_vector_array(ttbar_p4)
-    
 class ResolutionCalculator:
     """Calculate mass resolution metrics."""
 
@@ -268,6 +191,16 @@ def _prep_leptons(top, tbar, lep_pos, lep_neg):
     lep_neg_2 = boost(lep_neg_1, tbar_1)
 
     return lep_pos_2[:, :3], lep_neg_2[:, :3]
+
+def select_jets(jet_features, assignment_pred):
+    selected_jet_indices = assignment_pred.argmax(axis=-2)
+    reco_jets = np.take_along_axis(
+        jet_features,
+        selected_jet_indices[:, :, np.newaxis],
+        axis=1,
+    )
+    return reco_jets
+
 
 
 # ----------------------------------------------------------------------

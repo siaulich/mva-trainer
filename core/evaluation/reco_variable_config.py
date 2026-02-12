@@ -2,9 +2,9 @@
 
 import numpy as np
 from .physics_calculations import (
-    TopReconstructor,
     ResolutionCalculator,
     lorentz_vector_from_PtEtaPhiE_array,
+    select_jets,
     c_hel,
     c_han,
 )
@@ -14,6 +14,7 @@ from core.utils import (
     compute_mass_from_lorentz_vector_array,
     project_vectors_onto_axis,
     angle_vectors,
+    cos_angle_between_vectors,
 )
 
 # Function aliases
@@ -22,36 +23,21 @@ make_nu_4vect = lorentz_vector_from_neutrino_momenta_array
 
 
 reconstruction_variable_configs = {
-    "top_mass": {
-        "compute_func": lambda l, j, n: TopReconstructor.compute_top_masses(
-            TopReconstructor.compute_top_lorentz_vectors(l, j, n)[0] / 1e3,
-            TopReconstructor.compute_top_lorentz_vectors(l, j, n)[1] / 1e3,
-        ),
-        "extract_func": lambda X: TopReconstructor.compute_top_masses(
-            make_4vect(X["top_truth"][:, 0, :4]) / 1e3,
-            make_4vect(X["top_truth"][:, 1, :4]) / 1e3,
-        ),
-        "label": r"$m(t)$ [GeV]",
-        "combine_tops": True,
-        "use_relative_deviation": True,
-        "resolution": {
-            "use_relative_deviation": True,
-            "ylabel_resolution": r"Relative $m(t)$ Resolution",
-            "ylabel_deviation": r"Mean Relative $m(t)$ Deviation",
-        },
-    },
     "ttbar_mass": {
-        "compute_func": lambda l, j, n: TopReconstructor.compute_ttbar_mass(
-            *TopReconstructor.compute_top_lorentz_vectors(l, j, n)
+        "compute_func": lambda l, j, n: compute_mass_from_lorentz_vector_array(
+            l[:, 0, :4]
+            + j[:, 0, :4]
+            + n[:, 0, :]
+            + l[:, 1, :4]
+            + j[:, 1, :4]
+            + n[:, 1, :]
         )
         / 1e3,
-        "extract_func": lambda X: TopReconstructor.compute_ttbar_mass(
-            make_4vect(X["top_truth"][:, 0, :4]),
-            make_4vect(X["top_truth"][:, 1, :4]),
+        "extract_func": lambda X: compute_mass_from_lorentz_vector_array(
+            make_4vect(X["top_truth"][:, 0, :4]) + make_4vect(X["top_truth"][:, 1, :4])
         )
         / 1e3,
         "label": r"$m(t\overline{t})$ [GeV]",
-        "combine_tops": False,
         "use_relative_deviation": True,
         "resolution": {
             "use_relative_deviation": True,
@@ -61,9 +47,10 @@ reconstruction_variable_configs = {
     },
     "c_han": {
         "compute_func": lambda l, j, n: c_han(
-            *TopReconstructor.compute_top_lorentz_vectors(l, j, n),
-            make_4vect(l[:, 0, :4]),
-            make_4vect(l[:, 1, :4]),
+            l[:, 0, :4] + j[:, 0, :4] + n[:, 0, :],
+            l[:, 1, :4] + j[:, 1, :4] + n[:, 1, :],
+            l[:, 0, :4],
+            l[:, 1, :4],
         ),
         "extract_func": lambda X: c_han(
             make_4vect(X["top_truth"][:, 0, :4]),
@@ -72,7 +59,6 @@ reconstruction_variable_configs = {
             make_4vect(X["lepton_truth"][:, 1, :4]),
         ),
         "label": r"$c_{\text{han}}$",
-        "combine_tops": False,
         "use_relative_deviation": False,
         "resolution": {
             "use_relative_deviation": False,
@@ -82,9 +68,10 @@ reconstruction_variable_configs = {
     },
     "c_hel": {
         "compute_func": lambda l, j, n: c_hel(
-            *TopReconstructor.compute_top_lorentz_vectors(l, j, n),
-            make_4vect(l[:, 0, :4]),
-            make_4vect(l[:, 1, :4]),
+            l[:, 0, :4] + j[:, 0, :4] + n[:, 0, :],
+            l[:, 1, :4] + j[:, 1, :4] + n[:, 1, :],
+            l[:, 0, :4],
+            l[:, 1, :4],
         ),
         "extract_func": lambda X: c_hel(
             make_4vect(X["top_truth"][:, 0, :4]),
@@ -93,7 +80,6 @@ reconstruction_variable_configs = {
             make_4vect(X["lepton_truth"][:, 1, :4]),
         ),
         "label": r"$c_{\text{hel}}$",
-        "combine_tops": False,
         "use_relative_deviation": False,
         "resolution": {
             "use_relative_deviation": False,
@@ -101,17 +87,12 @@ reconstruction_variable_configs = {
             "ylabel_deviation": r"Mean $c_{\text{hel}}$ Deviation",
         },
     },
-    "neutrino_mag": {
-        "compute_func": lambda l, j, n: (
-            np.linalg.norm(n[:, 0, :], axis=-1) / 1e3,
-            np.linalg.norm(n[:, 1, :], axis=-1) / 1e3,
-        ),
+    "nu_mag": {
+        "compute_func": lambda l, j, n: (np.linalg.norm(n[:, 0, :3], axis=-1) / 1e3,),
         "extract_func": lambda X: (
-            np.linalg.norm(X["regression"][:, 0, :], axis=-1) / 1e3,
-            np.linalg.norm(X["regression"][:, 1, :], axis=-1) / 1e3,
+            np.linalg.norm(X["regression"][:, 0, :3], axis=-1) / 1e3,
         ),
         "label": r"$|\vec{p}(\nu)|$ [GeV]",
-        "combine_tops": True,
         "use_relative_deviation": True,
         "resolution": {
             "use_relative_deviation": True,
@@ -119,40 +100,23 @@ reconstruction_variable_configs = {
             "ylabel_deviation": r"Mean Relative $|\vec{p}(\nu)|$ Deviation",
         },
     },
-    "top_pt": {
-        "compute_func": lambda l, j, n: (
-            compute_pt_from_lorentz_vector_array(
-                TopReconstructor.compute_top_lorentz_vectors(l, j, n)[0]
-            )
-            / 1e3,
-            compute_pt_from_lorentz_vector_array(
-                TopReconstructor.compute_top_lorentz_vectors(l, j, n)[1]
-            )
-            / 1e3,
-        ),
+    "nubar_mag": {
+        "compute_func": lambda l, j, n: (np.linalg.norm(n[:, 1, :3], axis=-1) / 1e3,),
         "extract_func": lambda X: (
-            compute_pt_from_lorentz_vector_array(make_4vect(X["top_truth"][:, 0, :4]))
-            / 1e3,
-            compute_pt_from_lorentz_vector_array(make_4vect(X["top_truth"][:, 1, :4]))
-            / 1e3,
+            np.linalg.norm(X["regression"][:, 1, :3], axis=-1) / 1e3,
         ),
-        "label": r"$p_{T}(t)$ [GeV]",
-        "combine_tops": True,
+        "label": r"$|\vec{p}(\overline{\nu})|$ [GeV]",
         "use_relative_deviation": True,
         "resolution": {
             "use_relative_deviation": True,
-            "ylabel_resolution": r"Relative $p_{T}(t)$ Resolution",
-            "ylabel_deviation": r"Mean Relative $p_{T}(t)$ Deviation",
+            "ylabel_resolution": r"Relative $|\vec{p}(\overline{\nu})|$ Resolution",
+            "ylabel_deviation": r"Mean Relative $|\vec{p}(\overline{\nu})|$ Deviation",
         },
     },
     "nu_px": {
-        "compute_func": lambda l, j, n: (n[:, 0, 0] / 1e3, n[:, 1, 0] / 1e3),
-        "extract_func": lambda X: (
-            X["regression"][:, 0, 0] / 1e3,
-            X["regression"][:, 1, 0] / 1e3,
-        ),
+        "compute_func": lambda l, j, n: (n[:, 0, 0] / 1e3),
+        "extract_func": lambda X: (X["regression"][:, 0, 0] / 1e3),
         "label": r"$p_{x}(\nu)$ [GeV]",
-        "combine_tops": True,
         "use_relative_deviation": False,
         "resolution": {
             "use_relative_deviation": False,
@@ -161,13 +125,9 @@ reconstruction_variable_configs = {
         },
     },
     "nu_py": {
-        "compute_func": lambda l, j, n: (n[:, 0, 1] / 1e3, n[:, 1, 1] / 1e3),
-        "extract_func": lambda X: (
-            X["regression"][:, 0, 1] / 1e3,
-            X["regression"][:, 1, 1] / 1e3,
-        ),
+        "compute_func": lambda l, j, n: (n[:, 0, 1] / 1e3),
+        "extract_func": lambda X: (X["regression"][:, 0, 1] / 1e3),
         "label": r"$p_{y}(\nu)$ [GeV]",
-        "combine_tops": True,
         "use_relative_deviation": False,
         "resolution": {
             "use_relative_deviation": False,
@@ -176,13 +136,9 @@ reconstruction_variable_configs = {
         },
     },
     "nu_pz": {
-        "compute_func": lambda l, j, n: (n[:, 0, 2] / 1e3, n[:, 1, 2] / 1e3),
-        "extract_func": lambda X: (
-            X["regression"][:, 0, 2] / 1e3,
-            X["regression"][:, 1, 2] / 1e3,
-        ),
+        "compute_func": lambda l, j, n: (n[:, 0, 2] / 1e3),
+        "extract_func": lambda X: (X["regression"][:, 0, 2] / 1e3),
         "label": r"$p_{z}(\nu)$ [GeV]",
-        "combine_tops": True,
         "use_relative_deviation": False,
         "resolution": {
             "use_relative_deviation": False,
@@ -190,71 +146,111 @@ reconstruction_variable_configs = {
             "ylabel_deviation": r"Mean $p_{z}(\nu)$ Deviation [GeV]",
         },
     },
-    "top_px": {
-        "compute_func": lambda l, j, n: (
-            TopReconstructor.compute_top_lorentz_vectors(l, j, n)[0][..., 0] / 1e3,
-            TopReconstructor.compute_top_lorentz_vectors(l, j, n)[1][..., 0] / 1e3,
-        ),
-        "extract_func": lambda X: (
-            make_4vect(X["top_truth"][:, 0, :4])[..., 0] / 1e3,
-            make_4vect(X["top_truth"][:, 1, :4])[..., 0] / 1e3,
-        ),
-        "label": r"$p_{x}(t)$ [GeV]",
-        "combine_tops": True,
+    "nubar_px": {
+        "compute_func": lambda l, j, n: (n[:, 1, 0] / 1e3),
+        "extract_func": lambda X: (X["regression"][:, 1, 0] / 1e3),
+        "label": r"$p_{x}(\overline{\nu})$ [GeV]",
         "use_relative_deviation": False,
         "resolution": {
             "use_relative_deviation": False,
-            "ylabel_resolution": r"$p_{x}(t)$ Resolution [GeV]",
-            "ylabel_deviation": r"Mean $p_{x}(t)$ Deviation [GeV]",
+            "ylabel_resolution": r"$p_{x}(\overline{\nu})$ Resolution [GeV]",
+            "ylabel_deviation": r"Mean $p_{x}(\overline{\nu})$ Deviation [GeV]",
         },
     },
-    "top_py": {
-        "compute_func": lambda l, j, n: (
-            TopReconstructor.compute_top_lorentz_vectors(l, j, n)[0][..., 1] / 1e3,
-            TopReconstructor.compute_top_lorentz_vectors(l, j, n)[1][..., 1] / 1e3,
-        ),
-        "extract_func": lambda X: (
-            make_4vect(X["top_truth"][:, 0, :4])[..., 1] / 1e3,
-            make_4vect(X["top_truth"][:, 1, :4])[..., 1] / 1e3,
-        ),
-        "label": r"$p_{y}(t)$ [GeV]",
-        "combine_tops": True,
+    "nubar_py": {
+        "compute_func": lambda l, j, n: (n[:, 1, 1] / 1e3),
+        "extract_func": lambda X: (X["regression"][:, 1, 1] / 1e3),
+        "label": r"$p_{y}(\overline{\nu})$ [GeV]",
         "use_relative_deviation": False,
         "resolution": {
             "use_relative_deviation": False,
-            "ylabel_resolution": r"$p_{y}(t)$ Resolution [GeV]",
-            "ylabel_deviation": r"Mean $p_{y}(t)$ Deviation [GeV]",
+            "ylabel_resolution": r"$p_{y}(\overline{\nu})$ Resolution [GeV]",
+            "ylabel_deviation": r"Mean $p_{y}(\overline{\nu})$ Deviation [GeV]",
         },
     },
-    "top_pz": {
-        "compute_func": lambda l, j, n: (
-            TopReconstructor.compute_top_lorentz_vectors(l, j, n)[0][..., 2] / 1e3,
-            TopReconstructor.compute_top_lorentz_vectors(l, j, n)[1][..., 2] / 1e3,
-        ),
-        "extract_func": lambda X: (
-            make_4vect(X["top_truth"][:, 0, :4])[..., 2] / 1e3,
-            make_4vect(X["top_truth"][:, 1, :4])[..., 2] / 1e3,
-        ),
-        "label": r"$p_{z}(t)$ [GeV]",
-        "combine_tops": True,
+    "nubar_pz": {
+        "compute_func": lambda l, j, n: (n[:, 1, 2] / 1e3),
+        "extract_func": lambda X: (X["regression"][:, 1, 2] / 1e3),
+        "label": r"$p_{z}(\overline{\nu})$ [GeV]",
         "use_relative_deviation": False,
         "resolution": {
             "use_relative_deviation": False,
-            "ylabel_resolution": r"$p_{z}(t)$ Resolution [GeV]",
-            "ylabel_deviation": r"Mean $p_{z}(t)$ Deviation [GeV]",
+            "ylabel_resolution": r"$p_{z}(\overline{\nu})$ Resolution [GeV]",
+            "ylabel_deviation": r"Mean $p_{z}(\overline{\nu})$ Deviation [GeV]",
+        },
+    },
+    "nunubar_mag" : {
+        "compute_func": lambda l, j, n: (np.linalg.norm(n[:, 0, :3] + n[:, 1, :3], axis=-1) / 1e3,),
+        "extract_func": lambda X: (
+            np.linalg.norm(X["regression"][:, 0, :3] + X["regression"][:, 1, :3], axis=-1) / 1e3,
+        ),
+        "label": r"$|\vec{p}(\nu) + \vec{p}(\overline{\nu})|$ [GeV]",
+        "use_relative_deviation": True,
+        "resolution": {
+            "use_relative_deviation": True,
+            "ylabel_resolution": r"Relative $|\vec{p}(\nu) + \vec{p}(\overline{\nu})|$ Resolution",
+            "ylabel_deviation": r"Mean Relative $|\vec{p}(\nu) + \vec{p}(\overline{\nu})|$ Deviation",
+        },
+    },
+    "cos_angle_nu_lep": {
+        "compute_func": lambda l, j, n: cos_angle_between_vectors(
+            n[:, 0, :], l[:, 0, :4]
+        ),
+        "extract_func": lambda X: cos_angle_between_vectors(
+            X["regression"][:, 0, :], make_4vect(X["lep_inputs"][:, 0, :4])
+        ),
+        "label": r"$\cos\theta(\nu, \ell)$",
+        "use_relative_deviation": False,
+        "resolution": {
+            "use_relative_deviation": False,
+            "ylabel_resolution": r"$\cos\theta(\nu, \ell)$ Resolution",
+            "ylabel_deviation": r"Mean $\cos\theta(\nu, \ell)$ Deviation",
+        },
+    },
+    "cos_angle_nu_nubar": {
+        "compute_func": lambda l, j, n: cos_angle_between_vectors(
+            n[:, 0, :], n[:, 1, :]
+        ),
+        "extract_func": lambda X: cos_angle_between_vectors(
+            X["regression"][:, 0, :], X["regression"][:, 1, :]
+        ),
+        "label": r"$\cos\theta(\nu, \overline{\nu})$",
+        "use_relative_deviation": False,
+        "resolution": {
+            "use_relative_deviation": False,
+            "ylabel_resolution": r"$\cos\theta(\nu, \overline{\nu})$ Resolution",
+            "ylabel_deviation": r"Mean $\cos\theta(\nu, \overline{\nu})$ Deviation",
+        },
+    },
+    "cos_angle_nunubar_bbarll": {
+        "compute_func": lambda l, j, n: cos_angle_between_vectors(
+            n[:, 0, :] + n[:, 1, :], l[:, 0, :4] + l[:, 1, :4] + j[:, 0, :4] + j[:, 1, :4]
+        ),
+        "extract_func": lambda X: cos_angle_between_vectors(
+            X["regression"][:, 0, :] + X["regression"][:, 1, :],
+            make_4vect(X["lep_inputs"][:, 0, :4])
+            + make_4vect(X["lep_inputs"][:, 1, :4])
+            + select_jets(make_4vect(X["jet_inputs"]), X["assignment"])[:, 0, :4]
+            + select_jets(make_4vect(X["jet_inputs"]), X["assignment"])[:, 1, :4],
+            
+        ),
+        "label": r"$\cos\theta(\nu\overline{\nu}, b\overline{b}\ell^+\ell^-)$",
+        "use_relative_deviation": False,
+        "resolution": {
+            "use_relative_deviation": False,
+            "ylabel_resolution": r"$\cos\theta(\nu\overline{\nu}, b\overline{b}\ell^+\ell^-)$ Resolution",
+            "ylabel_deviation": r"Mean $\cos\theta(\nu\overline{\nu}, b\overline{b}\ell^+\ell^-)$ Deviation",
         },
     },
     "top_energy": {
         "compute_func": lambda l, j, n: (
-            TopReconstructor.compute_top_lorentz_vectors(l, j, n)[0][..., 3] / 1e3,
-            TopReconstructor.compute_top_lorentz_vectors(l, j, n)[1][..., 3] / 1e3,
+            compute_mass_from_lorentz_vector_array(
+                l[:, 0, :4] + j[:, 0, :4] + n[:, 0, :]
+            )
+            / 1e3
         ),
-        "extract_func": lambda X: (
-            make_4vect(X["top_truth"][:, 0, :4])[..., 3] / 1e3,
-            make_4vect(X["top_truth"][:, 1, :4])[..., 3] / 1e3,
-        ),
+        "extract_func": lambda X: (make_4vect(X["top_truth"][:, 0, :4])[..., 3] / 1e3,),
         "label": r"$E(t)$ [GeV]",
-        "combine_tops": True,
         "use_relative_deviation": True,
         "resolution": {
             "use_relative_deviation": True,
@@ -264,23 +260,14 @@ reconstruction_variable_configs = {
     },
     "top_pt": {
         "compute_func": lambda l, j, n: (
-            compute_pt_from_lorentz_vector_array(
-                TopReconstructor.compute_top_lorentz_vectors(l, j, n)[0]
-            )
-            / 1e3,
-            compute_pt_from_lorentz_vector_array(
-                TopReconstructor.compute_top_lorentz_vectors(l, j, n)[1]
-            )
-            / 1e3,
+            compute_pt_from_lorentz_vector_array(l[:, 0, :4] + j[:, 0, :4] + n[:, 0, :])
+            / 1e3
         ),
         "extract_func": lambda X: (
             compute_pt_from_lorentz_vector_array(make_4vect(X["top_truth"][:, 0, :4]))
-            / 1e3,
-            compute_pt_from_lorentz_vector_array(make_4vect(X["top_truth"][:, 1, :4]))
-            / 1e3,
+            / 1e3
         ),
         "label": r"$p_{T}(t)$ [GeV]",
-        "combine_tops": True,
         "use_relative_deviation": True,
         "resolution": {
             "use_relative_deviation": True,
@@ -290,27 +277,20 @@ reconstruction_variable_configs = {
     },
     "top_gamma": {
         "compute_func": lambda l, j, n: (
-            TopReconstructor.compute_top_lorentz_vectors(l, j, n)[0][..., 3]
+            l[:, 0, 3]
+            + j[:, 0, 3]
+            + n[:, 0, 3]
             / compute_mass_from_lorentz_vector_array(
-                TopReconstructor.compute_top_lorentz_vectors(l, j, n)[0]
-            ),
-            TopReconstructor.compute_top_lorentz_vectors(l, j, n)[1][..., 3]
-            / compute_mass_from_lorentz_vector_array(
-                TopReconstructor.compute_top_lorentz_vectors(l, j, n)[1]
-            ),
+                l[:, 0, :4] + j[:, 0, :4] + n[:, 0, :]
+            )
         ),
         "extract_func": lambda X: (
             make_4vect(X["top_truth"][:, 0, :4])[..., 3]
             / compute_mass_from_lorentz_vector_array(
                 make_4vect(X["top_truth"][:, 0, :4])
-            ),
-            make_4vect(X["top_truth"][:, 1, :4])[..., 3]
-            / compute_mass_from_lorentz_vector_array(
-                make_4vect(X["top_truth"][:, 1, :4])
-            ),
+            )
         ),
         "label": r"$\gamma(t)$",
-        "combine_tops": True,
         "use_relative_deviation": False,
         "resolution": {
             "use_relative_deviation": False,
@@ -318,31 +298,35 @@ reconstruction_variable_configs = {
             "ylabel_deviation": r"Mean $\gamma(t)$ Deviation",
         },
     },
+    "top_mass": {
+        "compute_func": lambda l, j, n: compute_mass_from_lorentz_vector_array(
+            l[:, 0, :4] + j[:, 0, :4] + n[:, 0, :]
+        )
+        / 1e3,
+        "extract_func": lambda X: compute_mass_from_lorentz_vector_array(
+            make_4vect(X["top_truth"][:, 0, :4])
+        )
+        / 1e3,
+        "label": r"$m(t)$ [GeV]",
+        "use_relative_deviation": True,
+        "resolution": {
+            "use_relative_deviation": True,
+            "ylabel_resolution": r"Relative $m(t)$ Resolution",
+            "ylabel_deviation": r"Mean Relative $m(t)$ Deviation",
+        },
+    },
     "W_mass": {
         "compute_func": lambda l, j, n: (
-            compute_mass_from_lorentz_vector_array(
-                make_4vect(l[:, 0, :4]) + make_nu_4vect(n[:, 0, :])
-            )
-            / 1e3,
-            compute_mass_from_lorentz_vector_array(
-                make_4vect(l[:, 1, :4]) + make_nu_4vect(n[:, 1, :])
-            )
-            / 1e3,
+            compute_mass_from_lorentz_vector_array((l[:, 0, :4]) + (n[:, 0, :])) / 1e3
         ),
         "extract_func": lambda X: (
             compute_mass_from_lorentz_vector_array(
                 make_4vect(X["lep_inputs"][:, 0, :4])
                 + make_nu_4vect(X["regression"][:, 0, :])
             )
-            / 1e3,
-            compute_mass_from_lorentz_vector_array(
-                make_4vect(X["lep_inputs"][:, 1, :4])
-                + make_nu_4vect(X["regression"][:, 1, :])
-            )
-            / 1e3,
+            / 1e3
         ),
         "label": r"$m(W)$ [GeV]",
-        "combine_tops": True,
         "use_relative_deviation": True,
         "resolution": {
             "use_relative_deviation": False,
@@ -352,23 +336,16 @@ reconstruction_variable_configs = {
     },
     "W_energy": {
         "compute_func": lambda l, j, n: (
-            (make_4vect(l[:, 0, :4])[..., 3] + make_nu_4vect(n[:, 0, :])[..., 3]) / 1e3,
-            (make_4vect(l[:, 1, :4])[..., 3] + make_nu_4vect(n[:, 1, :])[..., 3]) / 1e3,
+            ((l[:, 0, :4])[..., 3] + (n[:, 0, :])[..., 3]) / 1e3
         ),
         "extract_func": lambda X: (
             (
                 make_4vect(X["lep_inputs"][:, 0, :4])[..., 3]
                 + make_nu_4vect(X["regression"][:, 0, :])[..., 3]
             )
-            / 1e3,
-            (
-                make_4vect(X["lep_inputs"][:, 1, :4])[..., 3]
-                + make_nu_4vect(X["regression"][:, 1, :])[..., 3]
-            )
-            / 1e3,
+            / 1e3
         ),
         "label": r"$E(W)$ [GeV]",
-        "combine_tops": True,
         "use_relative_deviation": True,
         "resolution": {
             "use_relative_deviation": True,
@@ -378,85 +355,21 @@ reconstruction_variable_configs = {
     },
     "W_pt": {
         "compute_func": lambda l, j, n: (
-            compute_pt_from_lorentz_vector_array(
-                make_4vect(l[:, 0, :4]) + make_nu_4vect(n[:, 0, :])
-            )
-            / 1e3,
-            compute_pt_from_lorentz_vector_array(
-                make_4vect(l[:, 1, :4]) + make_nu_4vect(n[:, 1, :])
-            )
-            / 1e3,
+            compute_pt_from_lorentz_vector_array((l[:, 0, :4]) + (n[:, 0, :])) / 1e3
         ),
         "extract_func": lambda X: (
             compute_pt_from_lorentz_vector_array(
                 make_4vect(X["lep_inputs"][:, 0, :4])
                 + make_nu_4vect(X["regression"][:, 0, :])
             )
-            / 1e3,
-            compute_pt_from_lorentz_vector_array(
-                make_4vect(X["lep_inputs"][:, 1, :4])
-                + make_nu_4vect(X["regression"][:, 1, :])
-            )
-            / 1e3,
+            / 1e3
         ),
         "label": r"$p_{T}(W)$ [GeV]",
-        "combine_tops": True,
         "use_relative_deviation": True,
         "resolution": {
             "use_relative_deviation": True,
             "ylabel_resolution": r"Relative $p_{T}(W)$ Resolution",
             "ylabel_deviation": r"Mean Relative $p_{T}(W)$ Deviation",
-        },
-    },
-    "W_angular_distance": {
-        "compute_func": lambda l, j, n: (
-            (make_4vect(l[:, 0, :4]) + make_nu_4vect(n[:, 0, :]))[..., :3],
-            (make_4vect(l[:, 1, :4]) + make_nu_4vect(n[:, 1, :]))[..., :3],
-        ),
-        "extract_func": lambda X: (
-            (
-                make_4vect(X["lep_inputs"][:, 0, :4])
-                + make_nu_4vect(X["regression"][:, 0, :])
-            )[..., :3],
-            (
-                make_4vect(X["lep_inputs"][:, 1, :4])
-                + make_nu_4vect(X["regression"][:, 1, :])
-            )[..., :3],
-        ),
-        "label": r"$\Delta \phi(W_{\text{true}},W_{\text{reco}})$",
-        "combine_tops": True,
-        "deviation_label": r"$\Delta \phi(W_{\text{true}},W_{\text{reco}})$",
-        "deviation_function": lambda reco, true: angle_vectors(reco, true),
-        "resolution": {
-            "use_relative_deviation": True,
-            "ylabel_resolution": r"Relative $E(W)$ Resolution",
-            "ylabel_deviation": r"Mean Relative $E(W)$ Deviation",
-        },
-    },
-    "parallel_component_nu": {
-        "compute_func": lambda l, j, n: (
-            project_vectors_onto_axis(n[:, 0, :], make_4vect(l[:, 0, :4])[..., :3])
-            / 1e3,
-            project_vectors_onto_axis(n[:, 1, :], make_4vect(l[:, 1, :4])[..., :3])
-            / 1e3,
-        ),
-        "extract_func": lambda X: (
-            project_vectors_onto_axis(
-                X["regression"][:, 0, :], make_4vect(X["lep_inputs"][:, 0, :4])[..., :3]
-            )
-            / 1e3,
-            project_vectors_onto_axis(
-                X["regression"][:, 1, :], make_4vect(X["lep_inputs"][:, 1, :4])[..., :3]
-            )
-            / 1e3,
-        ),
-        "label": r"$p_{\parallel}(\nu)$ [GeV]",
-        "combine_tops": True,
-        "use_relative_deviation": False,
-        "resolution": {
-            "use_relative_deviation": False,
-            "ylabel_resolution": r"$p_{\parallel}(\nu)$ Resolution [GeV]",
-            "ylabel_deviation": r"Mean $p_{\parallel}(\nu)$ Deviation [GeV]",
         },
     },
 }

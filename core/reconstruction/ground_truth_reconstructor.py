@@ -6,12 +6,13 @@ from typing import Union
 
 class GroundTruthReconstructor(EventReconstructorBase):
     def __init__(
-        self, config: DataConfig, use_nu_flows=False
+        self, config: DataConfig, use_nu_flows=False,assignment_name="True Assignment",
     ):
         super().__init__(
             config=config,
-            assignment_name="Ground truth",
-            full_reco_name="True Assignment + " +( r"$\nu^2$-Flows" if use_nu_flows else r"True $\nu$"),
+            assignment_name=assignment_name,
+            full_reco_name=assignment_name +( r"$\nu^2$-Flows" if use_nu_flows else r"True $\nu$"),
+            neutrino_name= r"$\nu^2$-Flows" if use_nu_flows else r"True $\nu$",
             perform_regression=False, use_nu_flows=use_nu_flows
         )
         self.config = config
@@ -30,7 +31,8 @@ class PerfectAssignmentReconstructor(KerasFFRecoBase,GroundTruthReconstructor):
         EventReconstructorBase.__init__(self,
             config=config,
             assignment_name=assignment_name,
-            full_reco_name="True Assignment + " + neutrino_reco_name,
+            full_reco_name=assignment_name + neutrino_reco_name,
+            neutrino_name=neutrino_reco_name,
             perform_regression=True,
             use_nu_flows=False,
         )
@@ -43,7 +45,11 @@ class PerfectAssignmentReconstructor(KerasFFRecoBase,GroundTruthReconstructor):
         return KerasFFRecoBase.reconstruct_neutrinos(self, data_dict)
     
     def complete_forward_pass(self, data):
-        return self.predict_indices(data), self.reconstruct_neutrinos(data)
+        model_prediction = KerasFFRecoBase.complete_forward_pass(self, data)
+        assignment = GroundTruthReconstructor.predict_indices(self, data)
+        return assignment, model_prediction[1]
+
+
     
 class CompositeNeutrinoComponentReconstructor(KerasFFRecoBase):
     def __init__(
@@ -52,6 +58,7 @@ class CompositeNeutrinoComponentReconstructor(KerasFFRecoBase):
         EventReconstructorBase.__init__(self,
             config=config,
             assignment_name="Ground truth" if true_assignment else name,
+            neutrino_name=( r"$\nu^2$-Flows" if use_nu_flows else r"True $\nu$")+ "("+ (["x","y","z"][axis] if isinstance(axis,int) else (["x","y","z"][axis_i] for axis_i in axis).join(",")) + ")",
             full_reco_name=(name)+ " + " + ( r"$\nu^2$-Flows" if use_nu_flows else r"True $\nu$") + "("+ (["x","y","z"][axis] if isinstance(axis,int) else (["x","y","z"][axis_i] for axis_i in axis).join(",")) + ")",
             perform_regression=True,
         )

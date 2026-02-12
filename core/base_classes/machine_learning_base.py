@@ -10,9 +10,9 @@ import os
 from core.components import (
     onnx_support,
     GenerateMask,
-    InputPtEtaPhiELayer,
-    InputMetPhiLayer,
-    ComputeHighLevelFeatures,
+    ComputeHighLevelFeatures_from_PtEtaPhiE,
+    InputMetLayer,
+    ProcessPtEtaPhiELayer,
     PhysicsInformedLoss,
 )
 import core.components as components
@@ -23,8 +23,20 @@ from copy import deepcopy
 @keras.utils.register_keras_serializable()
 class KerasModelWrapper(keras.Model):
     def predict_dict(self, x, batch_size=2048, verbose=0, steps=None, **kwargs):
+        model_input_data = {}
+        for input in self.input:
+            input_name = input.name
+            if input_name not in x:
+                raise ValueError(
+                    f"Model expects input '{input_name}' which is not present in the data."
+                )
+            model_input_data[input_name] = x[input_name]
         predictions = super().predict(
-            x, batch_size=batch_size, verbose=verbose, steps=steps, **kwargs
+            model_input_data,
+            batch_size=batch_size,
+            verbose=verbose,
+            steps=steps,
+            **kwargs,
         )
         if not isinstance(predictions, dict):
             if not isinstance(predictions, list):
@@ -48,8 +60,8 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
             data_preprocessor (DataPreprocessor): An instance of the DataPreprocessor class
                 that provides preprocessed data and metadata required for model initialization.
         """
-        self.model: KerasModelWrapper = None
-        self.trainable_model: KerasModelWrapper = None
+        self.model: keras.models.Model = None
+        self.trainable_model: keras.models.Model = None
         self.history = None
         self.sample_weights = None
         self.class_weights = None
@@ -60,7 +72,7 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
         self.n_leptons: int = len(config.lepton_features)
         self.n_met: int = len(config.met_features) if config.met_features else 0
         self.n_global: int = (
-            len(config.global_event_features) if config.has_global_event_features else 0
+            len(config.global_event_inputs) if config.has_global_event_inputs else 0
         )
         self.padding_value: float = config.padding_value
         self.feature_index_dict = config.feature_indices
@@ -127,11 +139,12 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
                 regression_data - regression_mean
             ) / regression_std
 
-        if "reco_mass_deviation" in self.trainable_model.output_names:
+        if "reco_mass_deviation" in self.trainable_model.output:
             y_train["reco_mass_deviation"] = np.zeros(
                 (y_train["assignment"].shape[0], 1), dtype=np.float32
             )
-
+        if "confidence_loss_output" in self.trainable_model.output:
+            y_train["confidence_loss_output"] = y_train["assignment"]
         return X_train, y_train, sample_weights
 
     def add_reco_mass_deviation_loss(self):
@@ -145,10 +158,6 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
             )
         reco_mass_deviation_layer = PhysicsInformedLoss(name="reco_mass_deviation")
         neutrino_momenta = self.model.get_layer("regression").output
-        assignment_probs = self.model.get_layer("assignment").output
-        normalised_neutrino_output = self.trainable_model.get_layer(
-            "normalized_regression"
-        ).output
 
         if neutrino_momenta is None:
             raise ValueError(
@@ -160,19 +169,17 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
         reco_mass_deviation = reco_mass_deviation_layer(
             neutrino_momenta, lepton_momenta
         )
+        trainable_outputs = {**self.trainable_model.output}
+        trainable_outputs["reco_mass_deviation"] = reco_mass_deviation
         self.trainable_model = keras.Model(
             inputs=self.model.inputs,
-            outputs={
-                "assignment": assignment_probs,
-                "normalized_regression": normalised_neutrino_output,
-                "reco_mass_deviation": reco_mass_deviation,
-            },
+            outputs=trainable_outputs,
         )
 
         print("Added physics-informed loss to the model.")
 
     def _prepare_inputs(
-        self, log_variables=True, compute_HLF=False, use_global_event_features=False, transform_inputs=True
+        self, log_variables=True, compute_HLF=False, use_global_event_inputs=False
     ):
         jet_inputs = keras.Input(shape=(self.max_jets, self.n_jets), name="jet_inputs")
         lep_inputs = keras.Input(
@@ -180,7 +187,7 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
         )
         met_inputs = keras.Input(shape=(1, self.n_met), name="met_inputs")
 
-        if self.config.has_global_event_features:
+        if self.config.has_global_event_inputs:
             global_event_inputs = keras.Input(
                 shape=(self.n_global,),
                 name="global_event_inputs",
@@ -190,53 +197,37 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
         jet_mask = GenerateMask(padding_value=-999, name="jet_mask")(jet_inputs)
 
         # Transform inputs
-        transformed_jet_inputs = InputPtEtaPhiELayer(
+        transformed_jet_inputs = ProcessPtEtaPhiELayer(
             name="jet_input_transform",
-            log_variables=log_variables,
             padding_value=self.padding_value,
         )(jet_inputs)
-        transformed_lep_inputs = InputPtEtaPhiELayer(
+        transformed_lep_inputs = ProcessPtEtaPhiELayer(
             name="lep_input_transform",
-            log_variables=log_variables,
             padding_value=self.padding_value,
         )(lep_inputs)
-        transformed_met_inputs = InputMetPhiLayer(name="met_input_transform")(
-            met_inputs
-        )
+        transformed_met_inputs = InputMetLayer(name="met_input_transform")(met_inputs)
 
         if compute_HLF:
-            high_level_features = ComputeHighLevelFeatures(
+            high_level_features = ComputeHighLevelFeatures_from_PtEtaPhiE(
                 name="compute_high_level_features",
                 padding_value=self.padding_value,
             )(
-                jet_input=transformed_jet_inputs,
-                lepton_input=transformed_lep_inputs,
+                jet_input=jet_inputs,
+                lepton_input=lep_inputs,
                 jet_mask=jet_mask,
             )
 
-        # Normalize inputs
-        if transform_inputs:
-            normed_jet_inputs = keras.layers.Normalization(name="jet_input_normalization")(
-                transformed_jet_inputs
-            )
-            normed_lep_inputs = keras.layers.Normalization(name="lep_input_normalization")(
-                transformed_lep_inputs
-            )
-            normed_met_inputs = keras.layers.Normalization(name="met_input_normalization")(
-                transformed_met_inputs
-            )
-        else:
-            normed_jet_inputs = keras.layers.Normalization(name="jet_input_normalization")(
-                jet_inputs
-            )
-            normed_lep_inputs = keras.layers.Normalization(name="lep_input_normalization")(
-                lep_inputs
-            )
-            normed_met_inputs = keras.layers.Normalization(name="met_input_normalization")(
-                met_inputs
-            )
+        normed_jet_inputs = keras.layers.Normalization(name="jet_input_normalization")(
+            transformed_jet_inputs
+        )
+        normed_lep_inputs = keras.layers.Normalization(name="lep_input_normalization")(
+            transformed_lep_inputs
+        )
+        normed_met_inputs = keras.layers.Normalization(name="met_input_normalization")(
+            transformed_met_inputs
+        )
 
-        if self.config.has_global_event_features and use_global_event_features:
+        if self.config.has_global_event_inputs and use_global_event_inputs:
             print("Adding normalization for global event features")
             normed_global_event_inputs = keras.layers.Normalization(
                 name="global_event_input_normalization"
@@ -265,7 +256,7 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
             self.transformed_inputs["hlf_inputs"] = high_level_features
             self.normed_inputs["hlf_inputs"] = normed_hlf_inputs
 
-        if self.config.has_global_event_features and use_global_event_features:
+        if self.config.has_global_event_inputs and use_global_event_inputs:
             self.inputs["global_event_inputs"] = global_event_inputs
             self.transformed_inputs["global_event_inputs"] = global_event_inputs
             self.normed_inputs["global_event_inputs"] = normed_global_event_inputs
@@ -369,7 +360,7 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
             for name, obj in zip(components.__dict__.items(), utils.__dict__.items())
             if isinstance(obj, type) and issubclass(obj, keras.layers.Layer)
         }
-        custom_objects.update({"KerasModelWrapper": KerasModelWrapper})
+        custom_objects.update({"keras.models.Model": keras.models.Model})
         self.model_id = model_id
 
         self.model = keras.saving.load_model(file_path, custom_objects=custom_objects)
@@ -401,7 +392,7 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
         )
         lep_data = data["lep_inputs"][:num_events, :, :]
         met_data = data["met_inputs"][:num_events, :, :]
-        if self.config.has_global_event_features:
+        if self.config.has_global_event_inputs:
             global_event_data = data["global_event_inputs"][:num_events, :]
 
         # --- Helper: build a submodel up to (but not including) a target layer ---
@@ -427,7 +418,7 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
             "met_inputs": met_data,
         }
 
-        if self.config.has_global_event_features:
+        if self.config.has_global_event_inputs:
             input_data["global_event_inputs"] = global_event_data
 
         # --- Loop over normalization layers and adapt each ---
@@ -463,19 +454,19 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
             # neutrino_truth_std = np.std(data["regression"], axis=0)
             # neutrino_truth_mean = np.mean(data["regression"], axis=0)
             denormalisation_layer = keras.layers.Rescaling(
-                scale=1e5, # Scale neutrinos to 100 GeV by default
+                scale=1e5,  # Scale neutrinos to 100 GeV by default
                 # offset=neutrino_truth_mean,
                 # scale = neutrino_truth_std,
                 name="regression",
             )
-            self.model = KerasModelWrapper(
+            outputs = self.model.output
+            outputs["regression"] = denormalisation_layer(
+                self.model.get_layer("normalized_regression").output
+            )
+            outputs.pop("normalized_regression")
+            self.model = keras.models.Model(
                 inputs=self.model.inputs,
-                outputs={
-                    "assignment": self.model.get_layer("assignment").output,
-                    "regression": denormalisation_layer(
-                        self.model.get_layer("normalized_regression").output
-                    ),
-                },
+                outputs=outputs,
             )
             print("Set regression denormalization layer with computed mean and std.")
 
@@ -503,36 +494,39 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
                 "File path must end with .onnx. Please provide a valid file path."
             )
 
-        # Define input shapes
-        jet_shape = (self.max_jets, self.n_jets)
-        lep_shape = (self.NUM_LEPTONS, self.n_leptons)
-        input_shapes = [jet_shape, lep_shape]
-        if self.n_met > 0:
-            met_shape = (1, self.n_met)
-            input_shapes.append(met_shape)
-        if (
-            self.config.has_global_event_features
-            and "global_event_inputs" in self.model.input
-        ):
-            global_event_shape = (self.n_global,)
-            input_shapes.append(global_event_shape)
+        input_shapes = {}
+        for input in self.model.inputs:
+            input_name = input.name.split(":")[0]
+            input_shapes[input_name] = input.shape[1:]
 
         # Create a new model that takes a flat input and splits it
-        flat_input_size = sum(np.prod(shape) for shape in input_shapes)
+        flat_input_size = sum(np.prod(shape) for shape in input_shapes.values())
         flat_input = keras.Input(shape=(flat_input_size,), name="flat_input")
 
-        split_layer = onnx_support.SplitInputsLayer(input_shapes)
+        split_layer = onnx_support.SplitInputsLayer(
+            input_shapes.values(), name="split_inputs"
+        )
         split_inputs = split_layer(flat_input)
 
-        model_outputs = self.model([*split_inputs])
+        model_input_dict = {}
+        for i, input in enumerate(input_shapes.keys()):
+            model_input_dict[input] = split_inputs[i]
+
+        model_outputs = self.model(model_input_dict)
 
         wrapped_model = keras.Model(inputs=flat_input, outputs=model_outputs)
 
+        named_outputs = {}
+        for k, v in model_outputs.items():
+            named_outputs[k] = keras.layers.Lambda(
+                lambda x, n=k: tf.identity(x, n), name=f"{k}"
+            )(v)  # layer name irrelevant
+
         # Convert to ONNX
         spec = (tf.TensorSpec((None, flat_input_size), tf.float32, name="flat_input"),)
-        onnx_model,_ = tf2onnx.convert.from_keras(
-            wrapped_model,
-            input_signature=spec,   
+        onnx_model, _ = tf2onnx.convert.from_keras(
+            keras.models.Model(inputs=flat_input, outputs=named_outputs),
+            input_signature=spec,
         )
 
         meta = onnx_model.metadata_props.add()
@@ -543,8 +537,12 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
         meta.key = "NN_max_jets"
         meta.value = str(self.max_jets)
 
+        meta = onnx_model.metadata_props.add()
+        meta.key = "input_names"
+        meta.value = ",".join(input_shapes.keys())
+
         # Save ONNX model
         onnx.save_model(onnx_model, onnx_file_path)
 
-
         print(f"ONNX model saved to {onnx_file_path}")
+        return wrapped_model

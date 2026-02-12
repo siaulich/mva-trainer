@@ -215,3 +215,41 @@ def vector3_to_PtEtaPhi(vector: np.ndarray) -> np.ndarray:
     eta = np.arcsinh(pz / np.clip(pt, 1e-10, None))
     phi = np.arctan2(py, px)
     return np.stack((pt, eta, phi), axis=-1)
+
+def cos_angle_between_vectors(vec1: np.ndarray, vec2: np.ndarray, axis=-1) -> np.ndarray:
+    """
+    Computes the cosine of the angle between two vectors.
+
+    Args:
+        a: First vector (n_events, 3)
+        b: Second vector (n_events, 3)
+        axis: Axis along which to compute the angle (default: -1)
+
+    Returns:
+        Array of cosine values (n_events,)
+    """
+    a = vec1[..., :3]  # Ensure we only use the spatial components
+    b = vec2[..., :3]
+
+    dot_product = np.sum(a * b, axis=axis)
+    norm_a = np.linalg.norm(a, axis=axis)
+    norm_b = np.linalg.norm(b, axis=axis)
+
+    # Avoid division by zero and invalid values
+    valid = (norm_a > 1e-10) & (norm_b > 1e-10) & np.isfinite(dot_product)
+    cos_angle = np.where(valid, dot_product / (norm_a * norm_b), 0.0)
+    return np.clip(cos_angle, -1.0, 1.0)
+
+def magnitude_of_vector(vec: np.ndarray, axis=-1) -> np.ndarray:
+    """
+    Computes the magnitude of a vector.
+
+    Args:
+        vector: Input vector (n_events, 3)
+        axis: Axis along which to compute the magnitude (default: -1)
+
+    Returns:
+        Array of magnitudes (n_events,)
+    """
+    a = vec[..., :3]  # Ensure we only use the spatial components
+    return np.linalg.norm(a, axis=axis)

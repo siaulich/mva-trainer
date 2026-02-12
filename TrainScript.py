@@ -136,7 +136,7 @@ if __name__ == "__main__":
             ]
             for key, value in model_config.compile_options["metrics"].items()
         },
-        loss_weights=model_config.compile_options.get("loss_weights", {}),
+        loss_weights=model_config.compile_options.get("loss_weights", None),
         add_physics_informed_loss=model_config.compile_options.get(
             "add_physics_informed_loss", False
         ),
