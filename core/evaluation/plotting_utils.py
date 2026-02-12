@@ -232,7 +232,7 @@ class SelectionAccuracyPlotter:
         ax.set_xticklabels(names, rotation=45, ha="right")
         ax.set_ylabel("Selection Accuracy")
         ax.set_title(
-            f"Selection Accuracy of Jet Reconstructors ({config.confidence*100:.0f}% CI)"
+            f"Selection Accuracy ({config.confidence*100:.0f}% CI)"
         )
         ax.set_ylim(0, 1)
         ax.grid(axis="y", alpha=config.alpha)
@@ -852,7 +852,7 @@ class DistributionPlotter:
 
     @staticmethod
     def plot_feature_distributions(
-        feature_values: List[np.ndarray],
+        feature_values: np.ndarray,
         feature_label: str,
         event_weights: Optional[np.ndarray] = None,
         labels: Optional[List[str]] = None,

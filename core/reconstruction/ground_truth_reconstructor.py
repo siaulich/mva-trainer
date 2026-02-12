@@ -6,12 +6,12 @@ from typing import Union
 
 class GroundTruthReconstructor(EventReconstructorBase):
     def __init__(
-        self, config: DataConfig, use_nu_flows=False
+        self, config: DataConfig, use_nu_flows=False,assignment_name="True Assignment",
     ):
         super().__init__(
             config=config,
-            assignment_name="Ground truth",
-            full_reco_name="True Assignment + " +( r"$\nu^2$-Flows" if use_nu_flows else r"True $\nu$"),
+            assignment_name=assignment_name,
+            full_reco_name=assignment_name +( r"$\nu^2$-Flows" if use_nu_flows else r"True $\nu$"),
             neutrino_name= r"$\nu^2$-Flows" if use_nu_flows else r"True $\nu$",
             perform_regression=False, use_nu_flows=use_nu_flows
         )
@@ -31,7 +31,7 @@ class PerfectAssignmentReconstructor(KerasFFRecoBase,GroundTruthReconstructor):
         EventReconstructorBase.__init__(self,
             config=config,
             assignment_name=assignment_name,
-            full_reco_name="True Assignment + " + neutrino_reco_name,
+            full_reco_name=assignment_name + neutrino_reco_name,
             neutrino_name=neutrino_reco_name,
             perform_regression=True,
             use_nu_flows=False,

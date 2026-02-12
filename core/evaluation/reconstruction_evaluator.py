@@ -33,7 +33,6 @@ from .plotting_utils import (
 )
 
 from .physics_calculations import (
-    TopReconstructor,
     ResolutionCalculator,
     c_hel,
     c_han,
@@ -310,8 +309,9 @@ class ReconstructionPlotter:
     def __init__(
         self,
         prediction_manager: PredictionManager,
+        reco_variable_configs: dict = reconstruction_variable_configs,
     ):
-        self.variable_configs = reconstruction_variable_configs
+        self.variable_configs = reco_variable_configs
         self.prediction_manager = prediction_manager
 
         self.X_test = prediction_manager.X_test
@@ -320,7 +320,7 @@ class ReconstructionPlotter:
         self.config = self.prediction_manager.reconstructors[0].config
 
         self.variable_handler = ReconstructionVariableHandler(
-            reconstruction_variable_configs, prediction_manager, self.X_test
+            reco_variable_configs, prediction_manager, self.X_test
         )
 
     def _validate_configs(self):
@@ -1044,7 +1044,6 @@ class ReconstructionPlotter:
             **kwargs,
         )
 
-        axes.set_title(f"{variable_label} Deviation for all Reconstructors")
 
         return fig, axes
 
