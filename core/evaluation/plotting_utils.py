@@ -907,7 +907,7 @@ class DistributionPlotter:
                 valid_values,
                 bins=bin_edges,
                 weights=valid_weights,
-                alpha=0.5,
+                #alpha=0.5,
                 label=label,
                 histtype="step",
                 linewidth=2,

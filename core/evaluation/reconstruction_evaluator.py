@@ -1139,7 +1139,7 @@ class ReconstructionPlotter:
         config = self.variable_configs[variable_key]
         # Set defaults from config, allow kwargs to override
         defaults = {
-            "use_relative_deviation": config.get("use_relative_deviation", False),
+            "use_relative_deviation": kwargs["use_relative_deviation"] if "use_relative_deviation" in kwargs else config.get("use_relative_deviation", False),
             "deviation_function": config.get("deviation_function", None),
         }
         if "deviation_label" in config:

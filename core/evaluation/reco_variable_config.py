@@ -244,8 +244,8 @@ reconstruction_variable_configs = {
     },
     "top_energy": {
         "compute_func": lambda l, j, n: (
-            compute_mass_from_lorentz_vector_array(
-                l[:, 0, :4] + j[:, 0, :4] + n[:, 0, :]
+            (
+                l[:, 0, 3] + j[:, 0, 3] + n[:, 0, 3]
             )
             / 1e3
         ),
@@ -277,10 +277,10 @@ reconstruction_variable_configs = {
     },
     "top_gamma": {
         "compute_func": lambda l, j, n: (
-            l[:, 0, 3]
+            (l[:, 0, 3]
             + j[:, 0, 3]
             + n[:, 0, 3]
-            / compute_mass_from_lorentz_vector_array(
+            )/ compute_mass_from_lorentz_vector_array(
                 l[:, 0, :4] + j[:, 0, :4] + n[:, 0, :]
             )
         ),
