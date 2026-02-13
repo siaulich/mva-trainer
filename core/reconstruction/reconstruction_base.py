@@ -137,7 +137,8 @@ class KerasFFRecoBase(EventReconstructorBase, KerasMLWrapper):
         use_nu_flows=True,
         load_model_path=None,
     ):
-        super().__init__(
+        EventReconstructorBase.__init__(
+            self,
             config=config,
             assignment_name=name,
             full_reco_name=(
@@ -148,6 +149,7 @@ class KerasFFRecoBase(EventReconstructorBase, KerasMLWrapper):
             perform_regression=perform_regression,
             use_nu_flows=use_nu_flows,
         )
+        KerasMLWrapper.__init__(self, config=config, name=name)
         self.model: keras.models.Model = None
         self.trainable_model: keras.models.Model = None
         if load_model_path is not None:

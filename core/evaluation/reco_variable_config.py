@@ -53,10 +53,10 @@ reconstruction_variable_configs = {
             l[:, 1, :4],
         ),
         "extract_func": lambda X: c_han(
-            make_4vect(X["top_truth"][:, 0, :4]),
-            make_4vect(X["top_truth"][:, 1, :4]),
-            make_4vect(X["lepton_truth"][:, 0, :4]),
-            make_4vect(X["lepton_truth"][:, 1, :4]),
+            (X["top_truth"][:, 0, :4]),
+            (X["top_truth"][:, 1, :4]),
+            (X["lepton_truth"][:, 0, :4]),
+            (X["lepton_truth"][:, 1, :4]),
         ),
         "label": r"$c_{\text{han}}$",
         "use_relative_deviation": False,
@@ -74,10 +74,10 @@ reconstruction_variable_configs = {
             l[:, 1, :4],
         ),
         "extract_func": lambda X: c_hel(
-            make_4vect(X["top_truth"][:, 0, :4]),
-            make_4vect(X["top_truth"][:, 1, :4]),
-            make_4vect(X["lepton_truth"][:, 0, :4]),
-            make_4vect(X["lepton_truth"][:, 1, :4]),
+            (X["top_truth"][:, 0, :4]),
+            (X["top_truth"][:, 1, :4]),
+            (X["lepton_truth"][:, 0, :4]),
+            (X["lepton_truth"][:, 1, :4]),
         ),
         "label": r"$c_{\text{hel}}$",
         "use_relative_deviation": False,
@@ -197,7 +197,7 @@ reconstruction_variable_configs = {
             n[:, 0, :], l[:, 0, :4]
         ),
         "extract_func": lambda X: cos_angle_between_vectors(
-            X["regression"][:, 0, :], make_4vect(X["lep_inputs"][:, 0, :4])
+            X["regression"][:, 0, :], X["lepton_truth"][:, 0, :4]
         ),
         "label": r"$\cos\theta(\nu, \ell)$",
         "use_relative_deviation": False,
@@ -228,8 +228,8 @@ reconstruction_variable_configs = {
         ),
         "extract_func": lambda X: cos_angle_between_vectors(
             X["regression"][:, 0, :] + X["regression"][:, 1, :],
-            make_4vect(X["lep_inputs"][:, 0, :4])
-            + make_4vect(X["lep_inputs"][:, 1, :4])
+            X["lepton_truth"][:, 0, :4]
+            + X["lepton_truth"][:, 1, :4]
             + select_jets(make_4vect(X["jet_inputs"]), X["assignment"])[:, 0, :4]
             + select_jets(make_4vect(X["jet_inputs"]), X["assignment"])[:, 1, :4],
             
@@ -321,7 +321,7 @@ reconstruction_variable_configs = {
         ),
         "extract_func": lambda X: (
             compute_mass_from_lorentz_vector_array(
-                make_4vect(X["lep_inputs"][:, 0, :4])
+                X["lepton_truth"][:, 0, :4]
                 + make_nu_4vect(X["regression"][:, 0, :])
             )
             / 1e3
@@ -340,7 +340,7 @@ reconstruction_variable_configs = {
         ),
         "extract_func": lambda X: (
             (
-                make_4vect(X["lep_inputs"][:, 0, :4])[..., 3]
+                X["lepton_truth"][:, 0, :4][..., 3]
                 + make_nu_4vect(X["regression"][:, 0, :])[..., 3]
             )
             / 1e3
@@ -359,7 +359,7 @@ reconstruction_variable_configs = {
         ),
         "extract_func": lambda X: (
             compute_pt_from_lorentz_vector_array(
-                make_4vect(X["lep_inputs"][:, 0, :4])
+                X["lepton_truth"][:, 0, :4]
                 + make_nu_4vect(X["regression"][:, 0, :])
             )
             / 1e3

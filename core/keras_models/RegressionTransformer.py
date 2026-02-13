@@ -36,6 +36,7 @@ class FullRecoTransformer(KerasFFRecoBase):
         dropout_rate,
         num_heads=8,
         use_global_event_inputs=False,
+        compute_HLF=True,
     ):
         """
         Builds the Assignment Transformer model.
@@ -48,7 +49,7 @@ class FullRecoTransformer(KerasFFRecoBase):
             keras.Model: The constructed Keras model.
         """
         normed_inputs, masks = self._prepare_inputs(
-            use_global_event_inputs=use_global_event_inputs,
+            use_global_event_inputs=use_global_event_inputs,compute_HLF=compute_HLF
         )
         normed_jet_inputs = normed_inputs["jet_inputs"]
         normed_lep_inputs = normed_inputs["lepton_inputs"]

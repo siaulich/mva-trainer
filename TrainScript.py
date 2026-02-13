@@ -114,16 +114,16 @@ if __name__ == "__main__":
     X, y = data_preprocessor.get_data()
 
     model = keras_models._get_model(model_config.model_type)
-    even_trained_model = model(data_config)
+    model = model(data_config)
 
     build_options = model_config.model_options
     build_options.update(**model_config.model_params)
 
-    even_trained_model.build_model(**(build_options))
+    model.build_model(**(build_options))
 
-    even_trained_model.adapt_normalization_layers(X)
+    model.adapt_normalization_layers(X)
 
-    even_trained_model.compile_model(
+    model.compile_model(
         optimizer=keras.optimizers.get(model_config.compile_options["optimizer"]),
         loss={
             key: getattr(utils, value["class_name"])(**value.get("config", {}))
@@ -150,28 +150,27 @@ if __name__ == "__main__":
         callbacks.append(callback_class(**callback_params))
     train_options["callbacks"] = callbacks
 
-    even_history = even_trained_model.train_model(
-        X,
+    X_train, y_train, sample_weights = model.prepare_training_data(
+        X, y, copy_data=True, sample_weights=utils.compute_sample_weights(X, y)
+    )
+
+    even_history = model.train_model(
+        X_train,
+        y_train,
         **train_options,
     )
 
     if not os.path.exists(args.output_dir):
         os.makedirs(args.output_dir)
     if args.event_numbers == "even":
-        even_trained_model.save_model(os.path.join(args.output_dir, f"odd_model.keras"))
-        even_trained_model.export_to_onnx(
-            os.path.join(args.output_dir, "odd_model.onnx")
-        )
+        model.save_model(os.path.join(args.output_dir, f"odd_model.keras"))
+        model.export_to_onnx(os.path.join(args.output_dir, "odd_model.onnx"))
     elif args.event_numbers == "odd":
-        even_trained_model.save_model(
-            os.path.join(args.output_dir, f"even_model.keras")
-        )
-        even_trained_model.export_to_onnx(
-            os.path.join(args.output_dir, "even_model.onnx")
-        )
+        model.save_model(os.path.join(args.output_dir, f"even_model.keras"))
+        model.export_to_onnx(os.path.join(args.output_dir, "even_model.onnx"))
     else:
-        even_trained_model.save_model(os.path.join(args.output_dir, f"model.keras"))
-        even_trained_model.export_to_onnx(os.path.join(args.output_dir, "model.onnx"))
+        model.save_model(os.path.join(args.output_dir, f"model.keras"))
+        model.export_to_onnx(os.path.join(args.output_dir, "model.onnx"))
 
     with open(os.path.join(args.output_dir, "model_config.yaml"), "w") as file:
         yaml.dump(

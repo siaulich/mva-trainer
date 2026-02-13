@@ -50,8 +50,6 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
         self,
         config: DataConfig,
         name="ml_assigner",
-        assignment_name=None,
-        full_reco_name=None,
         model_id=None,
     ):
         """
@@ -76,7 +74,6 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
         )
         self.padding_value: float = config.padding_value
         self.feature_index_dict = config.feature_indices
-        self.perform_regression = False
 
         # initialize empty dicts to hold inputs and transformed inputs
         self.inputs = {}
@@ -85,42 +82,34 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
         self.masks = {}
         self.model_id = None
 
-        # Use assignment_name and full_reco_name if provided, otherwise fall back to name
-        if assignment_name is None:
-            assignment_name = name
-        if full_reco_name is None:
-            full_reco_name = name
-
-        super().__init__(
-            config=config,
-            assignment_name=assignment_name,
-            full_reco_name=full_reco_name,
-        )
 
     def build_model(self, **kwargs):
         raise NotImplementedError("Subclasses must implement build_model method.")
         pass
 
     def prepare_training_data(
-        self, data, sample_weights=None, class_weights=None, copy_data=False
+        self, X,y =None, sample_weights=None, class_weights=None, copy_data=False
     ):
         self.sample_weights = sample_weights
         self.class_weights = class_weights
         for input_name in self.inputs.keys():
-            if input_name not in data:
+            if input_name not in X:
                 raise ValueError(f"Input '{input_name}' not found in data dictionary.")
 
         if copy_data:
-            X_train = {key: deepcopy(data[key]) for key in self.inputs.keys()}
+            X_train = {key: deepcopy(X[key]) for key in self.inputs.keys()}
         else:
-            X_train = {key: data[key] for key in self.inputs.keys()}
+            X_train = {key: X[key] for key in self.inputs.keys()}
         y_train = {}
 
         # Rename targets to match model output names
-        y_train["assignment"] = data["assignment"]
-        y_train["regression"] = {}
-        y_train["regression"]["regression"] = data["regression"] if "regression" in data else None
-        y_train["regression"]["true_lepton"] = np.stack([data["top_lepton_truth"], data["tbar_lepton_truth"]], axis=-1) if "top_lepton_truth" in data and "tbar_lepton_truth" in data else None
+        if y is None:
+            y_train["assignment"] = X["assignment"]
+            y_train["regression"] = X["regression"] if "regression" in y else None
+        else:
+            y_train = y.copy()  if not copy_data else deepcopy(y)
+
+
         if not self.perform_regression:
             y_train.pop("regression")
 
@@ -136,13 +125,15 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
                     "Regression layer is not a Rescaling layer. Cannot prepare regression targets."
                 )
             regression_std = upscale_layer.scale
-            regression_mean = upscale_layer.offset
-            y_train["normalized_regression"] = {}
-            for key in regression_data:
-                if regression_data[key] is not None:
-                    y_train["normalized_regression"][key] = (regression_data[key] - regression_mean) / regression_std
-                else:
-                    y_train["normalized_regression"][key] = None
+            if isinstance(regression_data, dict):
+                y_train["normalized_regression"] = {}
+                for key in regression_data:
+                    if regression_data[key] is not None:
+                        y_train["normalized_regression"][key] = regression_data[key] / regression_std
+                    else:
+                        y_train["normalized_regression"][key] = None
+            else:
+                y_train["normalized_regression"] = regression_data / regression_std
 
         if "reco_mass_deviation" in self.trainable_model.output:
             y_train["reco_mass_deviation"] = np.zeros(
@@ -270,10 +261,11 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
 
     def train_model(
         self,
-        data,
+        X,
+        y,
         epochs,
         batch_size,
-        sample_weights=None,
+        sample_weight=None,
         validation_split=0.2,
         callbacks=[],
         copy_data=False,
@@ -284,9 +276,6 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
                 "Model has not been built yet. Call build_model() before train_model()."
             )
 
-        X_train, y_train, sample_weights = self.prepare_training_data(
-            data, sample_weights=sample_weights, copy_data=copy_data
-        )
         if self.trainable_model is None:
             self.trainable_model = self.model
 
@@ -297,9 +286,9 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
 
         if self.history is None:
             self.history = self.trainable_model.fit(
-                X_train,
-                y_train,
-                sample_weight=sample_weights,
+                X,
+                y,
+                sample_weight=sample_weight,
                 epochs=epochs,
                 batch_size=batch_size,
                 validation_split=validation_split,
@@ -308,9 +297,9 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
             )
         else:
             append_history = self.trainable_model.fit(
-                X_train,
-                y_train,
-                sample_weight=sample_weights,
+                X,
+                y,
+                sample_weight=sample_weight,
                 epochs=epochs,
                 batch_size=batch_size,
                 validation_split=validation_split,
@@ -387,6 +376,11 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
         through all preceding layers (up to but excluding the normalization layer).
         """
         # --- Prepare and unpad jet data ---
+        for key in self.inputs.keys():
+            if key not in data:
+                raise ValueError(f"Expected input '{key}' not found in data dictionary.")
+
+
         jet_data = data["jet_inputs"]  # (num_events, n_jets, n_features)
         jet_mask = np.any(jet_data != self.padding_value, axis=-1)
         unpadded_jet_data = jet_data[jet_mask]
@@ -397,7 +391,8 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
         )
         lep_data = data["lep_inputs"][:num_events, :, :]
         met_data = data["met_inputs"][:num_events, :, :]
-        if self.config.has_global_event_inputs:
+        global_event_data = None
+        if "global_event_inputs" in data:
             global_event_data = data["global_event_inputs"][:num_events, :]
 
         # --- Helper: build a submodel up to (but not including) a target layer ---
@@ -422,8 +417,7 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
             "lep_inputs": lep_data,
             "met_inputs": met_data,
         }
-
-        if self.config.has_global_event_inputs:
+        if global_event_data is not None:
             input_data["global_event_inputs"] = global_event_data
 
         # --- Loop over normalization layers and adapt each ---
