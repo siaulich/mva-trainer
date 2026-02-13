@@ -777,6 +777,13 @@ class RootPreprocessor:
         lep_tbar_e = np.sqrt(
             lep_tbar_mass**2 + lep_tbar_pt**2 * np.cosh(lep_tbar_eta) ** 2
         )
+        top_lep_px = lep_top_pt * np.cos(lep_top_phi)
+        top_lep_py = lep_top_pt * np.sin(lep_top_phi)
+        top_lep_pz = lep_top_pt * np.sinh(lep_top_eta)
+
+        tbar_lep_px = lep_tbar_pt * np.cos(lep_tbar_phi)
+        tbar_lep_py = lep_tbar_pt * np.sin(lep_tbar_phi)
+        tbar_lep_pz = lep_tbar_pt * np.sinh(lep_tbar_eta)
 
         # Extract neutrino information
         nu_top_pt = ak.to_numpy(events.Ttbar_MC_Wdecay2_afterFSR_from_t_pt)
@@ -843,16 +850,14 @@ class RootPreprocessor:
             "truth_tbar_neutrino_py": nu_tbar_py,
             "truth_tbar_neutrino_pz": nu_tbar_pz,
             # Leptons from W decays
-            "truth_top_lepton_mass": lep_top_mass,
-            "truth_top_lepton_pt": lep_top_pt,
-            "truth_top_lepton_eta": lep_top_eta,
-            "truth_top_lepton_phi": lep_top_phi,
             "truth_top_lepton_e": lep_top_e,
-            "truth_tbar_lepton_mass": lep_tbar_mass,
-            "truth_tbar_lepton_pt": lep_tbar_pt,
-            "truth_tbar_lepton_eta": lep_tbar_eta,
-            "truth_tbar_lepton_phi": lep_tbar_phi,
             "truth_tbar_lepton_e": lep_tbar_e,
+            "truth_top_lepton_px": top_lep_px,
+            "truth_top_lepton_py": top_lep_py,
+            "truth_top_lepton_pz": top_lep_pz,
+            "truth_tbar_lepton_px": tbar_lep_px,
+            "truth_tbar_lepton_py": tbar_lep_py,
+            "truth_tbar_lepton_pz": tbar_lep_pz,
         }
 
     def _extract_nuflow_results(self, events: ak.Array) -> Dict[str, np.ndarray]:

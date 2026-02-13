@@ -37,12 +37,12 @@ reconstruction_variable_configs = {
             make_4vect(X["top_truth"][:, 0, :4]) + make_4vect(X["top_truth"][:, 1, :4])
         )
         / 1e3,
-        "label": r"$m(t\overline{t})$ [GeV]",
+        "label": r"$m(t\bar{t})$ [GeV]",
         "use_relative_deviation": True,
         "resolution": {
             "use_relative_deviation": True,
-            "ylabel_resolution": r"Relative $m(t\overline{t})$ Resolution",
-            "ylabel_deviation": r"Mean Relative $m(t\overline{t})$ Deviation",
+            "ylabel_resolution": r"Relative $m(t\bar{t})$ Resolution",
+            "ylabel_deviation": r"Mean Relative $m(t\bar{t})$ Deviation",
         },
     },
     "c_han": {
@@ -105,12 +105,12 @@ reconstruction_variable_configs = {
         "extract_func": lambda X: (
             np.linalg.norm(X["regression"][:, 1, :3], axis=-1) / 1e3,
         ),
-        "label": r"$|\vec{p}(\overline{\nu})|$ [GeV]",
+        "label": r"$|\vec{p}(\bar{\nu})|$ [GeV]",
         "use_relative_deviation": True,
         "resolution": {
             "use_relative_deviation": True,
-            "ylabel_resolution": r"Relative $|\vec{p}(\overline{\nu})|$ Resolution",
-            "ylabel_deviation": r"Mean Relative $|\vec{p}(\overline{\nu})|$ Deviation",
+            "ylabel_resolution": r"Relative $|\vec{p}(\bar{\nu})|$ Resolution",
+            "ylabel_deviation": r"Mean Relative $|\vec{p}(\bar{\nu})|$ Deviation",
         },
     },
     "nu_px": {
@@ -149,34 +149,34 @@ reconstruction_variable_configs = {
     "nubar_px": {
         "compute_func": lambda l, j, n: (n[:, 1, 0] / 1e3),
         "extract_func": lambda X: (X["regression"][:, 1, 0] / 1e3),
-        "label": r"$p_{x}(\overline{\nu})$ [GeV]",
+        "label": r"$p_{x}(\bar{\nu})$ [GeV]",
         "use_relative_deviation": False,
         "resolution": {
             "use_relative_deviation": False,
-            "ylabel_resolution": r"$p_{x}(\overline{\nu})$ Resolution [GeV]",
-            "ylabel_deviation": r"Mean $p_{x}(\overline{\nu})$ Deviation [GeV]",
+            "ylabel_resolution": r"$p_{x}(\bar{\nu})$ Resolution [GeV]",
+            "ylabel_deviation": r"Mean $p_{x}(\bar{\nu})$ Deviation [GeV]",
         },
     },
     "nubar_py": {
         "compute_func": lambda l, j, n: (n[:, 1, 1] / 1e3),
         "extract_func": lambda X: (X["regression"][:, 1, 1] / 1e3),
-        "label": r"$p_{y}(\overline{\nu})$ [GeV]",
+        "label": r"$p_{y}(\bar{\nu})$ [GeV]",
         "use_relative_deviation": False,
         "resolution": {
             "use_relative_deviation": False,
-            "ylabel_resolution": r"$p_{y}(\overline{\nu})$ Resolution [GeV]",
-            "ylabel_deviation": r"Mean $p_{y}(\overline{\nu})$ Deviation [GeV]",
+            "ylabel_resolution": r"$p_{y}(\bar{\nu})$ Resolution [GeV]",
+            "ylabel_deviation": r"Mean $p_{y}(\bar{\nu})$ Deviation [GeV]",
         },
     },
     "nubar_pz": {
         "compute_func": lambda l, j, n: (n[:, 1, 2] / 1e3),
         "extract_func": lambda X: (X["regression"][:, 1, 2] / 1e3),
-        "label": r"$p_{z}(\overline{\nu})$ [GeV]",
+        "label": r"$p_{z}(\bar{\nu})$ [GeV]",
         "use_relative_deviation": False,
         "resolution": {
             "use_relative_deviation": False,
-            "ylabel_resolution": r"$p_{z}(\overline{\nu})$ Resolution [GeV]",
-            "ylabel_deviation": r"Mean $p_{z}(\overline{\nu})$ Deviation [GeV]",
+            "ylabel_resolution": r"$p_{z}(\bar{\nu})$ Resolution [GeV]",
+            "ylabel_deviation": r"Mean $p_{z}(\bar{\nu})$ Deviation [GeV]",
         },
     },
     "nunubar_mag" : {
@@ -184,12 +184,12 @@ reconstruction_variable_configs = {
         "extract_func": lambda X: (
             np.linalg.norm(X["regression"][:, 0, :3] + X["regression"][:, 1, :3], axis=-1) / 1e3,
         ),
-        "label": r"$|\vec{p}(\nu) + \vec{p}(\overline{\nu})|$ [GeV]",
+        "label": r"$|\vec{p}(\nu) + \vec{p}(\bar{\nu})|$ [GeV]",
         "use_relative_deviation": True,
         "resolution": {
             "use_relative_deviation": True,
-            "ylabel_resolution": r"Relative $|\vec{p}(\nu) + \vec{p}(\overline{\nu})|$ Resolution",
-            "ylabel_deviation": r"Mean Relative $|\vec{p}(\nu) + \vec{p}(\overline{\nu})|$ Deviation",
+            "ylabel_resolution": r"Relative $|\vec{p}(\nu) + \vec{p}(\bar{\nu})|$ Resolution",
+            "ylabel_deviation": r"Mean Relative $|\vec{p}(\nu) + \vec{p}(\bar{\nu})|$ Deviation",
         },
     },
     "cos_angle_nu_lep": {
@@ -214,12 +214,12 @@ reconstruction_variable_configs = {
         "extract_func": lambda X: cos_angle_between_vectors(
             X["regression"][:, 0, :], X["regression"][:, 1, :]
         ),
-        "label": r"$\cos\theta(\nu, \overline{\nu})$",
+        "label": r"$\cos\theta(\nu, \bar{\nu})$",
         "use_relative_deviation": False,
         "resolution": {
             "use_relative_deviation": False,
-            "ylabel_resolution": r"$\cos\theta(\nu, \overline{\nu})$ Resolution",
-            "ylabel_deviation": r"Mean $\cos\theta(\nu, \overline{\nu})$ Deviation",
+            "ylabel_resolution": r"$\cos\theta(\nu, \bar{\nu})$ Resolution",
+            "ylabel_deviation": r"Mean $\cos\theta(\nu, \bar{\nu})$ Deviation",
         },
     },
     "cos_angle_nunubar_bbarll": {
@@ -234,12 +234,12 @@ reconstruction_variable_configs = {
             + select_jets(make_4vect(X["jet_inputs"]), X["assignment"])[:, 1, :4],
             
         ),
-        "label": r"$\cos\theta(\nu\overline{\nu}, b\overline{b}\ell^+\ell^-)$",
+        "label": r"$\cos\theta(\nu\bar{\nu}, b\bar{b}\ell^+\ell^-)$",
         "use_relative_deviation": False,
         "resolution": {
             "use_relative_deviation": False,
-            "ylabel_resolution": r"$\cos\theta(\nu\overline{\nu}, b\overline{b}\ell^+\ell^-)$ Resolution",
-            "ylabel_deviation": r"Mean $\cos\theta(\nu\overline{\nu}, b\overline{b}\ell^+\ell^-)$ Deviation",
+            "ylabel_resolution": r"$\cos\theta(\nu\bar{\nu}, b\bar{b}\ell^+\ell^-)$ Resolution",
+            "ylabel_deviation": r"Mean $\cos\theta(\nu\bar{\nu}, b\bar{b}\ell^+\ell^-)$ Deviation",
         },
     },
     "top_energy": {

@@ -118,7 +118,9 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
 
         # Rename targets to match model output names
         y_train["assignment"] = data["assignment"]
-        y_train["regression"] = data["regression"]
+        y_train["regression"] = {}
+        y_train["regression"]["regression"] = data["regression"] if "regression" in data else None
+        y_train["regression"]["true_lepton"] = np.stack([data["top_lepton_truth"], data["tbar_lepton_truth"]], axis=-1) if "top_lepton_truth" in data and "tbar_lepton_truth" in data else None
         if not self.perform_regression:
             y_train.pop("regression")
 
@@ -135,9 +137,12 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
                 )
             regression_std = upscale_layer.scale
             regression_mean = upscale_layer.offset
-            y_train["normalized_regression"] = (
-                regression_data - regression_mean
-            ) / regression_std
+            y_train["normalized_regression"] = {}
+            for key in regression_data:
+                if regression_data[key] is not None:
+                    y_train["normalized_regression"][key] = (regression_data[key] - regression_mean) / regression_std
+                else:
+                    y_train["normalized_regression"][key] = None
 
         if "reco_mass_deviation" in self.trainable_model.output:
             y_train["reco_mass_deviation"] = np.zeros(

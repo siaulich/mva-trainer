@@ -1148,7 +1148,7 @@ class ReconstructionPlotter:
             label = config["label"]
             variable_label = (
                 f"Relative Deviation in {label}"
-                if config["use_relative_deviation"]
+                if defaults["use_relative_deviation"]
                 else f"Deviation in {label}"
             )
 
