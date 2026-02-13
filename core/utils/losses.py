@@ -287,7 +287,43 @@ class MagnitudeDirectionLoss(keras.losses.Loss):
             }
         )
         return config
+    
+class RestframeLoss(keras.losses.Loss):
+    def __init__(self, name="restframe_loss", **kwargs):
+        super().__init__(name=name, **kwargs)
 
+    def call(self, y_true, y_pred):
+        true_neutrinos = y_true[:,:2,:]  # shape (batch, 2, 4)
+        restframe_4vec = y_true[:,2:,:] # shape (batch, 2, 4)
+        true_neutrinos = true_neutrinos[...,:3]
+        pred_neutrinos = y_pred
+        # Compute the 4-momentum of the neutrinos in the rest frame
+        pred_neutrinos_4vec = tf.concat(
+            [pred_neutrinos, tf.norm(pred_neutrinos, axis=-1, keepdims=True),], axis=-1
+        )  # shape (batch, 2, 4)
+        true_neutrinos_4vec = tf.concat(
+            [true_neutrinos, tf.norm(true_neutrinos, axis=-1, keepdims=True),], axis=-1
+        )  # shape (batch, 2, 4)
+
+
+        # Boost the neutrino 4-vectors to the rest frame
+        def lorentz_boost(p, beta):
+            beta = tf.clip_by_value(beta, -0.999, 0.999)  # avoid superluminal
+            gamma = 1.0 / tf.sqrt(1.0 - beta * beta)
+            bp = tf.reduce_sum(beta * p[..., :3], axis=-1, keepdims=True)
+            p_parallel = bp * beta / (beta * beta + 1e-8)
+            p_perp = p[..., :3] - p_parallel
+            energy = p[..., 3:4]
+            boosted_energy = gamma * (energy - bp)
+            boosted_p_parallel = gamma * (p_parallel - beta * energy)
+            boosted_p_perp = p_perp
+            boosted_p = boosted_p_parallel + boosted_p_perp
+            return tf.concat([boosted_p, boosted_energy], axis=-1)
+        pred_neutrinos_rest = lorentz_boost(pred_neutrinos_4vec, restframe_4vec[..., :3] / (restframe_4vec[..., 3:4] + 1e-8))
+        true_neutrinos_rest = lorentz_boost(true_neutrinos_4vec, restframe_4vec[..., :3] / (restframe_4vec[..., 3:4] + 1e-8))
+        # Compute the loss as the mean squared error of the neutrino 3-momenta in the rest frame
+        loss = tf.reduce_mean(tf.square(pred_neutrinos_rest[..., :3] - true_neutrinos_rest[..., :3]), axis=[1, 2])  # shape (batch,)
+        return loss
 
 class ConfidenceScoreLoss(keras.losses.Loss):
     def __init__(self, epsilon=1e-7, name="confidence_score_loss", **kwargs):
