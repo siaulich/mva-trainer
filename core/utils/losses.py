@@ -305,24 +305,21 @@ class RestframeLoss(keras.losses.Loss):
             [true_neutrinos, tf.norm(true_neutrinos, axis=-1, keepdims=True),], axis=-1
         )  # shape (batch, 2, 4)
 
+        beta = restframe_4vec[..., :3] / (restframe_4vec[..., 3:4] + 1e-8)  # shape (batch, 2, 3)
+        p = pred_neutrinos_4vec - true_neutrinos_4vec
 
-        # Boost the neutrino 4-vectors to the rest frame
-        def lorentz_boost(p, beta):
-            beta = tf.clip_by_value(beta, -0.999, 0.999)  # avoid superluminal
-            gamma = 1.0 / tf.sqrt(1.0 - beta * beta)
-            bp = tf.reduce_sum(beta * p[..., :3], axis=-1, keepdims=True)
-            p_parallel = bp * beta / (beta * beta + 1e-8)
-            p_perp = p[..., :3] - p_parallel
-            energy = p[..., 3:4]
-            boosted_energy = gamma * (energy - bp)
-            boosted_p_parallel = gamma * (p_parallel - beta * energy)
-            boosted_p_perp = p_perp
-            boosted_p = boosted_p_parallel + boosted_p_perp
-            return tf.concat([boosted_p, boosted_energy], axis=-1)
-        pred_neutrinos_rest = lorentz_boost(pred_neutrinos_4vec, restframe_4vec[..., :3] / (restframe_4vec[..., 3:4] + 1e-8))
-        true_neutrinos_rest = lorentz_boost(true_neutrinos_4vec, restframe_4vec[..., :3] / (restframe_4vec[..., 3:4] + 1e-8))
-        # Compute the loss as the mean squared error of the neutrino 3-momenta in the rest frame
-        loss = tf.reduce_mean(tf.square(pred_neutrinos_rest[..., :3] - true_neutrinos_rest[..., :3]), axis=[1, 2])  # shape (batch,)
+        beta = tf.clip_by_value(beta, -0.999, 0.999)  # avoid superluminal
+        gamma = 1.0 / tf.sqrt(1.0 - beta * beta)
+        bp = tf.reduce_sum(beta * p[..., :3], axis=-1, keepdims=True)
+        p_parallel = bp * beta / (beta * beta + 1e-8)
+        p_perp = p[..., :3] - p_parallel
+        energy = p[..., 3:4]
+        boosted_energy = gamma * (energy - bp)
+        boosted_p_parallel = gamma * (p_parallel - beta * energy)
+        boosted_p_perp = p_perp
+        boosted_p = boosted_p_parallel + boosted_p_perp
+        rest_frame_difference =  tf.concat([boosted_p, boosted_energy], axis=-1)
+        loss = tf.reduce_mean(tf.square(rest_frame_difference[...,:3]), axis=[1, 2])
         return loss
 
 class ConfidenceScoreLoss(keras.losses.Loss):
@@ -356,6 +353,9 @@ class ConfidenceScoreLoss(keras.losses.Loss):
             correct_assignment * tf.math.log(confidence_scores)
             + (1.0 - correct_assignment) * tf.math.log(1.0 - confidence_scores)
         )
+        if sample_weight is not None:
+            sample_weight = tf.reshape(tf.cast(sample_weight, bce.dtype), [-1])
+            bce = bce * sample_weight
         return bce
 
 
