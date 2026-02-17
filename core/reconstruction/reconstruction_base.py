@@ -18,7 +18,7 @@ class EventReconstructorBase(BaseUtilityModel, ABC):
         config: DataConfig,
         assignment_name,
         full_reco_name,
-        neutrino_name = None,
+        neutrino_name=None,
         perform_regression=True,
         use_nu_flows=True,
     ):
@@ -149,7 +149,9 @@ class KerasFFRecoBase(EventReconstructorBase, KerasMLWrapper):
             perform_regression=perform_regression,
             use_nu_flows=use_nu_flows,
         )
-        KerasMLWrapper.__init__(self, config=config, name=name)
+        KerasMLWrapper.__init__(
+            self, config=config, name=name, perform_regression=perform_regression
+        )
         self.model: keras.models.Model = None
         self.trainable_model: keras.models.Model = None
         if load_model_path is not None:
@@ -168,6 +170,10 @@ class KerasFFRecoBase(EventReconstructorBase, KerasMLWrapper):
         outputs["assignment"] = jet_assignment_probs
         trainable_outputs["assignment"] = jet_assignment_probs
 
+        if self.perform_regression and regression_output is None:
+            raise ValueError(
+                "perform_regression is True but no regression_output provided to build_model."
+            )
         if self.perform_regression and regression_output is not None:
             outputs["normalized_regression"] = regression_output
             trainable_outputs["normalized_regression"] = regression_output
@@ -296,7 +302,7 @@ class KerasFFRecoBase(EventReconstructorBase, KerasMLWrapper):
             )
 
         return self.complete_forward_pass(data)[1]
-    
+
     def predict(self, data: dict[str : np.ndarray], batch_size=2048, verbose=0):
         inputs = {}
         for key in self.model.input:
@@ -305,14 +311,17 @@ class KerasFFRecoBase(EventReconstructorBase, KerasMLWrapper):
             elif isinstance(key, str):
                 input_name = key
             else:
-                raise ValueError(f"Unexpected input key type: {type(key)}. Expected a Keras tensor or string.")
+                raise ValueError(
+                    f"Unexpected input key type: {type(key)}. Expected a Keras tensor or string."
+                )
             if input_name in data:
                 inputs[input_name] = data[input_name]
             else:
-                raise ValueError(f"Expected input '{input_name}' not found in data dictionary.")
+                raise ValueError(
+                    f"Expected input '{input_name}' not found in data dictionary."
+                )
         predictions = self.model.predict(inputs, batch_size=batch_size, verbose=verbose)
         return predictions
-
 
     def complete_forward_pass(self, data: dict[str : np.ndarray]):
         """

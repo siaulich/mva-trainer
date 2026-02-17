@@ -14,6 +14,8 @@ Configuration:
 
 import numpy as np
 import pandas as pd
+import yaml
+
 from typing import Optional, Dict, List, Tuple, Union
 
 from .Configs import LoadConfig, DataConfig
@@ -647,6 +649,13 @@ class DataPreprocessor:
         return X_even, y_even, X_odd, y_odd
 
 
+def load_yaml_config(file_path):
+    """Load a YAML configuration file."""
+    with open(file_path, "r") as file:
+        config = yaml.safe_load(file)
+    return config
+
+
 def get_load_config_from_yaml(file_path: str) -> LoadConfig:
     """
     Load LoadConfig from a YAML file.
@@ -656,12 +665,11 @@ def get_load_config_from_yaml(file_path: str) -> LoadConfig:
     Returns:
         LoadConfig instance
     """
-    import yaml
 
-    with open(file_path, 'r') as file:
-        config_dict = yaml.safe_load(file)
-
-    return LoadConfig(**(config_dict["LoadConfig"]))
+    config_dict = load_yaml_config(file_path)
+    if "LoadConfig" not in config_dict:
+        raise ValueError("YAML file must contain a 'LoadConfig' section")
+    return LoadConfig(**config_dict["LoadConfig"])
 
 
 def combine_train_datasets(

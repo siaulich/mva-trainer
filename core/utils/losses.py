@@ -287,40 +287,59 @@ class MagnitudeDirectionLoss(keras.losses.Loss):
             }
         )
         return config
-    
+
+
+import tensorflow as tf
+import keras
+
+
+@keras.utils.register_keras_serializable()
 class RestframeLoss(keras.losses.Loss):
-    def __init__(self, name="restframe_loss", **kwargs):
+
+    def __init__(self, eps=1e-6, name="restframe_loss", **kwargs):
         super().__init__(name=name, **kwargs)
+        self.eps = eps
+
+    def to_4vec(self, p3):
+        energy = tf.sqrt(tf.reduce_sum(p3**2, axis=-1, keepdims=True) + self.eps)
+        return tf.concat([p3, energy], axis=-1)
+
+    def boost(self, p4, beta):
+        beta2 = tf.reduce_sum(beta**2, axis=-1, keepdims=True)
+        beta2 = tf.clip_by_value(beta2, 0.0, 1.0 - 1e-6)
+        gamma = 1.0 / tf.sqrt(1.0 - beta2 + self.eps)
+
+        p_vec = p4[..., :3]
+        E = p4[..., 3:4]
+
+        bp = tf.reduce_sum(beta * p_vec, axis=-1, keepdims=True)
+        p_parallel = (bp / (beta2 + self.eps)) * beta  # Fixed
+        p_perp = p_vec - p_parallel
+
+        boosted_E = gamma * (E + bp)
+        boosted_p_parallel = gamma * (p_parallel + beta * E)  # Fixed sign
+        boosted_p = boosted_p_parallel + p_perp
+
+        return tf.concat([boosted_p, boosted_E], axis=-1)
 
     def call(self, y_true, y_pred):
-        true_neutrinos = y_true[:,:2,:]  # shape (batch, 2, 4)
-        restframe_4vec = y_true[:,2:,:] # shape (batch, 2, 4)
-        true_neutrinos = true_neutrinos[...,:3]
-        pred_neutrinos = y_pred
-        # Compute the 4-momentum of the neutrinos in the rest frame
-        pred_neutrinos_4vec = tf.concat(
-            [pred_neutrinos, tf.norm(pred_neutrinos, axis=-1, keepdims=True),], axis=-1
-        )  # shape (batch, 2, 4)
-        true_neutrinos_4vec = tf.concat(
-            [true_neutrinos, tf.norm(true_neutrinos, axis=-1, keepdims=True),], axis=-1
-        )  # shape (batch, 2, 4)
+        true_neutrinos = y_true[:, :2, :3]  # (batch,2,3)
+        restframe_4vec = y_true[:, 2:, :]  # (batch,2,4)
 
-        beta = restframe_4vec[..., :3] / (restframe_4vec[..., 3:4] + 1e-8)  # shape (batch, 2, 3)
-        p = pred_neutrinos_4vec - true_neutrinos_4vec
+        pred_neutrinos = y_pred  # (batch,2,3)
 
-        beta = tf.clip_by_value(beta, -0.999, 0.999)  # avoid superluminal
-        gamma = 1.0 / tf.sqrt(1.0 - beta * beta)
-        bp = tf.reduce_sum(beta * p[..., :3], axis=-1, keepdims=True)
-        p_parallel = bp * beta / (beta * beta + 1e-8)
-        p_perp = p[..., :3] - p_parallel
-        energy = p[..., 3:4]
-        boosted_energy = gamma * (energy - bp)
-        boosted_p_parallel = gamma * (p_parallel - beta * energy)
-        boosted_p_perp = p_perp
-        boosted_p = boosted_p_parallel + boosted_p_perp
-        rest_frame_difference =  tf.concat([boosted_p, boosted_energy], axis=-1)
-        loss = tf.reduce_mean(tf.square(rest_frame_difference[...,:3]), axis=[1, 2])
+        pred_4 = self.to_4vec(pred_neutrinos)
+        true_4 = self.to_4vec(true_neutrinos)
+
+        beta = -restframe_4vec[..., :3] / (restframe_4vec[..., 3:4] + self.eps)
+
+        diff = pred_4 - true_4
+
+        diff_boosted = self.boost(diff, beta)
+
+        loss = tf.reduce_mean(tf.square(diff_boosted), axis=[1, 2])
         return loss
+
 
 class ConfidenceScoreLoss(keras.losses.Loss):
     def __init__(self, epsilon=1e-7, name="confidence_score_loss", **kwargs):

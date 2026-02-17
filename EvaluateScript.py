@@ -33,3 +33,4 @@ class EvaluationConfig:
     evaluation_event_numbers: str = "even"
     evaluation_sample_size: Optional[int] = None
     output_dir: str = "evaluation_results"
+

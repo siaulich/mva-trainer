@@ -49,8 +49,7 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
     def __init__(
         self,
         config: DataConfig,
-        name="ml_assigner",
-        model_id=None,
+        perform_regression=False,
     ):
         """
         Initializes the AssignmentBaseModel class.
@@ -81,6 +80,7 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
         self.normed_inputs = {}
         self.masks = {}
         self.model_id = None
+        self.perform_regression = perform_regression
 
 
     def build_model(self, **kwargs):

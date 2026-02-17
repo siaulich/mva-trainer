@@ -53,8 +53,8 @@ reconstruction_variable_configs = {
             l[:, 1, :4],
         ),
         "extract_func": lambda X: c_han(
-            (X["top_truth"][:, 0, :4]),
-            (X["top_truth"][:, 1, :4]),
+            make_4vect(X["top_truth"][:, 0, :4]),
+            make_4vect(X["top_truth"][:, 1, :4]),
             (X["lepton_truth"][:, 0, :4]),
             (X["lepton_truth"][:, 1, :4]),
         ),
@@ -74,8 +74,8 @@ reconstruction_variable_configs = {
             l[:, 1, :4],
         ),
         "extract_func": lambda X: c_hel(
-            (X["top_truth"][:, 0, :4]),
-            (X["top_truth"][:, 1, :4]),
+            make_4vect(X["top_truth"][:, 0, :4]),
+            make_4vect(X["top_truth"][:, 1, :4]),
             (X["lepton_truth"][:, 0, :4]),
             (X["lepton_truth"][:, 1, :4]),
         ),

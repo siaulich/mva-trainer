@@ -196,8 +196,8 @@ def project_vectors_onto_axis(
 
 
 def angle_vectors(a: np.ndarray, b: np.ndarray, axis=-1) -> np.ndarray:
-    unit_a = a / np.linalg(a, axis=axis)
-    unit_b = b / np.linalg(b, axis=axis)
+    unit_a = a / np.linalg.norm(a, axis=axis)[..., np.newaxis]
+    unit_b = b / np.linalg.norm(b, axis=axis)[..., np.newaxis]
     return np.arccos(np.clip(np.sum(unit_a * unit_b, axis=axis), -1.0, 1.0))
 
 
