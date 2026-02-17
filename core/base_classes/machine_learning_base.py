@@ -50,6 +50,8 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
         self,
         config: DataConfig,
         perform_regression=False,
+        name=None,
+        **kwargs,
     ):
         """
         Initializes the AssignmentBaseModel class.

@@ -150,7 +150,7 @@ class KerasFFRecoBase(EventReconstructorBase, KerasMLWrapper):
             use_nu_flows=use_nu_flows,
         )
         KerasMLWrapper.__init__(
-            self, config=config, name=name, perform_regression=perform_regression
+            self, config=config, perform_regression=perform_regression
         )
         self.model: keras.models.Model = None
         self.trainable_model: keras.models.Model = None

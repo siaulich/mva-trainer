@@ -39,3 +39,10 @@ __all__ = [
     "TopReconstructor",
     "ResolutionCalculator",
 ]
+
+def get_reconstructor(reconstructor_type):
+    
+    if reconstructor_type not in globals():
+        raise ValueError(f"Unknown reconstructor type: {reconstructor_type}")
+    reconstructor_class = globals()[reconstructor_type]
+    return reconstructor_class

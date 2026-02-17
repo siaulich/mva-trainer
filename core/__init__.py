@@ -1,4 +1,4 @@
-from .Configs import DataConfig, LoadConfig
+from .Configs import DataConfig, LoadConfig, load_yaml_config, get_load_config_from_yaml
 
 try:
     import tensorflow as tf
@@ -8,4 +8,3 @@ try:
 except Exception:
     print("Could not set TensorFlow GPU memory growth.")
     pass
-

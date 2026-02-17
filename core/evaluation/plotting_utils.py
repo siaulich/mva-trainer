@@ -398,11 +398,11 @@ class ConfusionMatrixPlotter:
         )
 
         if normalize == "true":
-            hist = hist / hist.sum(axis=1, keepdims=True)
+            hist = hist / (hist.sum(axis=1, keepdims=True) + 1e-6)
         elif normalize == "pred":
-            hist = hist / hist.sum(axis=0, keepdims=True)
+            hist = hist / (hist.sum(axis=0, keepdims=True)  + 1e-6)
         elif normalize == "all":
-            hist = hist / hist.sum()
+            hist = hist / (hist.sum() + 1e-6)
         else:
             pass  # No normalization
 

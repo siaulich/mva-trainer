@@ -44,6 +44,7 @@ from core.utils import (
     project_vectors_onto_axis,
     lorentz_vector_from_PtEtaPhiE_array,
     lorentz_vector_from_neutrino_momenta_array,
+    scale_axis_tick_labels
 )
 
 
@@ -126,7 +127,6 @@ class PredictionManager:
                     regression_path,
                     predictions=self.predictions[idx]["regression"],
                 )
-            print(f"Predictions saved for {reconstructor.get_full_reco_name()}.")
 
         np.savez(
             os.path.join(output_dir, "event_indices.npz"),
@@ -161,7 +161,6 @@ class PredictionManager:
                     "regression": regression_predictions,
                 }
             )
-            print(f"Predictions loaded for {reconstructor.get_full_reco_name()}.")
         event_indices_path = os.path.join(input_dir, "event_indices.npz")
         event_indices_data = np.load(event_indices_path)
         loaded_event_indices = event_indices_data["event_indices"]
@@ -219,9 +218,6 @@ class ReconstructionVariableHandler:
             variable_name in self.reco_variable_cache
             and reconstructor_index in self.reco_variable_cache[variable_name]
         ):
-            print(
-                f"Using cached reconstructed variable '{variable_name}' for reconstructor {self.prediction_manager.reconstructors[reconstructor_index].get_full_reco_name()}."
-            )
             return self.reco_variable_cache[variable_name][reconstructor_index]
 
         variable_func = self.configs[variable_name]["compute_func"]
@@ -408,20 +404,14 @@ class ReconstructionPlotter:
             n_bootstrap=n_bootstrap,
         )
 
-        print("\nComputing bootstrap confidence intervals...")
         accuracies = []
 
         names = []
         for i, reconstructor in enumerate(self.prediction_manager.reconstructors):
             if isinstance(reconstructor, GroundTruthReconstructor):
-                print(f"{reconstructor.get_assignment_name()}: Ground Truth (skipping)")
                 continue
             mean_acc, lower, upper = self._bootstrap_accuracy(i, config)
             accuracies.append((mean_acc, lower, upper))
-            print(
-                f"{reconstructor.get_assignment_name()}: {mean_acc:.4f} "
-                f"[{lower:.4f}, {upper:.4f}]"
-            )
             names.append(reconstructor.get_assignment_name())
 
         return AccuracyPlotter.plot_overall_accuracies(names, accuracies, config)
@@ -439,20 +429,14 @@ class ReconstructionPlotter:
             n_bootstrap=n_bootstrap,
         )
 
-        print("\nComputing bootstrap confidence intervals...")
         selection_accuracies = []
 
         names = []
         for i, reconstructor in enumerate(self.prediction_manager.reconstructors):
             if isinstance(reconstructor, GroundTruthReconstructor):
-                print(f"{reconstructor.get_assignment_name()}: Ground Truth (skipping)")
                 continue
             mean_acc, lower, upper = self._bootstrap_selection_accuracy(i, config)
             selection_accuracies.append((mean_acc, lower, upper))
-            print(
-                f"{reconstructor.get_assignment_name()}: {mean_acc:.4f} "
-                f"[{lower:.4f}, {upper:.4f}]"
-            )
             names.append(reconstructor.get_assignment_name())
 
         return SelectionAccuracyPlotter.plot_selection_accuracies(
@@ -554,31 +538,20 @@ class ReconstructionPlotter:
             n_bootstrap=n_bootstrap,
         )
 
-        print("\nComputing bootstrap confidence intervals for neutrino deviation...")
         deviations = []
         names = []
 
         for i, reconstructor in enumerate(self.prediction_manager.reconstructors):
-            if isinstance(reconstructor, GroundTruthReconstructor):
-                print(f"{reconstructor.get_full_reco_name()}: Ground Truth (skipping)")
-                # continue
 
             # Check if reconstructor supports neutrino reconstruction
             neutrino_pred = self.prediction_manager.get_neutrino_predictions(i)
             if neutrino_pred is None:
-                print(
-                    f"{reconstructor.get_full_reco_name()}: No neutrino reconstruction (skipping)"
-                )
                 continue
 
             mean_dev, lower, upper = self._bootstrap_neutrino_deviation(
                 i, config, deviation_type
             )
             deviations.append((mean_dev, lower, upper))
-            print(
-                f"{reconstructor.get_full_reco_name()}: {mean_dev:.4f} "
-                f"[{lower:.4f}, {upper:.4f}]"
-            )
             names.append(reconstructor.get_full_reco_name())
 
         if not deviations:
@@ -639,7 +612,6 @@ class ReconstructionPlotter:
             )
 
         # Compute binned accuracies for each reconstructor
-        print(f"\nComputing binned accuracy for {feature_name}...")
         binned_accuracies = []
         names = []
         for i, reconstructor in enumerate(self.prediction_manager.reconstructors):
@@ -724,7 +696,6 @@ class ReconstructionPlotter:
                 binning_mask, combinatoric_per_event, event_weights
             )
 
-        print(f"\nComputing binned accuracy for {feature_name}...")
         binned_accuracies = []
         names = []
         for i, reconstructor in enumerate(self.prediction_manager.reconstructors):
@@ -875,7 +846,6 @@ class ReconstructionPlotter:
         event_weights = FeatureExtractor.get_event_weights(self.X_test)
 
         # Compute metric for each reconstructor
-        print(f"\nComputing binned {ylabel} for {feature_name}...")
         binned_metrics = []
 
         for i, reconstructor in enumerate(self.prediction_manager.reconstructors):
@@ -1402,7 +1372,6 @@ class ReconstructionPlotter:
             file_name = os.path.join(save_dir, file_name)
         with open(file_name, "w") as f:
             f.write(latex_str)
-        print(f"LaTeX table saved to {file_name}")
 
     def save_regression_error_latex_table(
         self,
@@ -1495,7 +1464,6 @@ class ReconstructionPlotter:
             file_name = os.path.join(save_dir, file_name)
         with open(file_name, "w") as f:
             f.write(latex_str)
-        print(f"LaTeX table saved to {file_name}")
         return latex_str
 
     def plot_binned_accuracy_quotients(
@@ -1550,7 +1518,6 @@ class ReconstructionPlotter:
         event_weights = FeatureExtractor.get_event_weights(self.X_test)
 
         # Compute binned quotients for each reconstructor
-        print(f"\nComputing binned accuracy quotients for {feature_name}...")
         binned_quotients = []
         names = []
 
@@ -1620,7 +1587,7 @@ class ReconstructionPlotter:
         return fig, ax
 
     def plot_relative_neutrino_deviations(
-        self, bins=10, xlims=None, coords="cartesian"
+        self, bins=20, xlims=None, coords="cartesian"
     ):
         """
         Plot deviation distributions for magnitude and direction of neutrino momenta
@@ -1634,7 +1601,19 @@ class ReconstructionPlotter:
         names = []
         nu_flows = False
         for i, reconstructor in enumerate(self.prediction_manager.reconstructors):
-            names.append(reconstructor.get_full_reco_name())
+            if reconstructor.use_nu_flows and not nu_flows:
+                nu_flows = True
+                names.append(r"\nu^2-Flows")
+            elif reconstructor.use_nu_flows and nu_flows:
+                continue
+            elif (
+                isinstance(reconstructor, GroundTruthReconstructor)
+                and not reconstructor.perform_regression
+            ):
+                continue
+            else:
+                names.append(reconstructor.get_neutrino_name())
+
             pred_neutrino = self.prediction_manager.get_neutrino_predictions(i)
 
             if coords == "spherical":
@@ -1786,3 +1765,173 @@ class ReconstructionPlotter:
 
         plt.tight_layout()
         return fig, ax
+
+    def plot_all_deviations(self, save_dir: Optional[str] = None):
+        """
+        Plot all deviation distributions for all variables and reconstructors.
+
+        Args:
+            save_dir: Optional directory to save the plots
+        """
+        for variable_key in self.variable_configs.keys():
+            config = self.variable_configs[variable_key]
+            deviation_config = config.get("resolution", {})
+            use_relative_deviation = deviation_config.get("use_relative_deviation", False)
+            deviation_function = deviation_config.get("deviation_function", None)
+            variable_label = config["label"]
+            if deviation_config.get("deviation_label"):
+                variable_label = deviation_config["deviation_label"]
+
+            fig, axes = self.plot_deviations_distributions_all_reconstructors(
+                variable_name=variable_key,
+                variable_label=variable_label,
+                use_relative_deviation=use_relative_deviation,
+                deviation_function=deviation_function,
+            )
+            if save_dir is not None:
+                file_name = f"{variable_key}_deviation_distributions.pdf"
+                file_path = os.path.join(save_dir, file_name)
+                fig.savefig(file_path)
+            plt.close(fig)
+
+    def plot_all_confusion_matrices(self, save_dir: Optional[str] = None, **kwargs):
+        """
+        Plot confusion matrices for all variables and reconstructors.
+
+        Args:
+            save_dir: Optional directory to save the plots
+            **kwargs: Additional arguments passed to plot_variable_confusion_matrix_for_all_reconstructors
+        """
+        for variable_key in self.variable_configs.keys():
+            config = self.variable_configs[variable_key]
+            variable_label = config["label"]
+
+            fig, axes = self.plot_variable_confusion_matrix_for_all_reconstructors(
+                variable_name=variable_key,
+                variable_label=variable_label,
+                **kwargs,
+            )
+            if save_dir is not None:
+                file_name = f"{variable_key}_confusion_matrices.pdf"
+                file_path = os.path.join(save_dir, file_name)
+                fig.savefig(file_path)
+            plt.close(fig)
+    
+    def plot_accuracy_evaluation(self, save_dir: Optional[str] = None, **kwargs):
+        """
+        Evaluate and print accuracy for all reconstructors.
+
+        Args:
+            save_dir: Optional directory to save the results
+            **kwargs: Additional arguments for evaluation
+        """
+
+        self.save_accuracy_latex_table(save_dir=os.path.join(save_dir), **kwargs)
+        fig, ax = self.plot_all_accuracies(**kwargs)
+        if save_dir is not None:
+            file_name = f"assignment_selection_accuracies.pdf"
+            file_path = os.path.join(save_dir, file_name)
+            fig.savefig(file_path)
+        plt.close(fig)
+        fig, ax = self.plot_all_selection_accuracies(**kwargs)
+        if save_dir is not None:
+            file_name = f"selection_accuracies.pdf"
+            file_path = os.path.join(save_dir, file_name)
+            fig.savefig(file_path)
+        plt.close(fig)
+
+    def plot_binned_performance_evaluation(
+        self,
+        save_dir: Optional[str] = None,
+        feature_type: str = "jet",
+        feature_name: str = "pt",
+        fancy_feature_label: Optional[str] = None,
+        rescale_factor: Optional[float] = None,
+        **kwargs,
+    ):
+        """
+        Evaluate and plot binned performance metrics for all reconstructors.
+
+        Args:
+            save_dir: Optional directory to save the results
+            feature_data_type: Type of feature data for binning
+            feature_name: Name of feature for binning
+            fancy_feature_label: Optional fancy label for the feature
+            **kwargs: Additional arguments for plotting
+
+        """
+        fig, ax = self.plot_binned_accuracy(
+            feature_data_type=feature_type,
+            feature_name=feature_name,
+            fancy_feature_label=fancy_feature_label,
+            **kwargs,
+        )
+        if rescale_factor is not None:
+            scale_axis_tick_labels(ax, rescale_factor)
+        if save_dir is not None:
+            file_name = f"binned_accuracies_{feature_name}.pdf"
+            file_path = os.path.join(save_dir, file_name)
+            fig.savefig(file_path)
+        plt.close(fig)
+        fig, ax = self.plot_binned_accuracy_quotients(
+            feature_data_type=feature_type,
+            feature_name=feature_name,
+            fancy_feature_label=fancy_feature_label,
+            **kwargs,
+        )
+        if rescale_factor is not None:
+            scale_axis_tick_labels(ax, rescale_factor)
+        if save_dir is not None:
+            file_name = f"binned_accuracy_quotients_{feature_name}.pdf"
+            file_path = os.path.join(save_dir, file_name)
+            fig.savefig(file_path)
+        plt.close(fig)
+        fig, ax = self.plot_binned_selection_accuracy(
+            feature_data_type=feature_type,
+            feature_name=feature_name,
+            fancy_feature_label=fancy_feature_label,
+            **kwargs,
+        )
+        if rescale_factor is not None:
+            scale_axis_tick_labels(ax, rescale_factor)
+        if save_dir is not None:
+            file_name = f"binned_selection_accuracies_{feature_name}.pdf"
+            file_path = os.path.join(save_dir, file_name)
+            fig.savefig(file_path)
+        plt.close(fig)
+
+        for variable_key in self.variable_configs.keys():
+
+            fig, ax = self.plot_binned_variable(
+                variable_key=variable_key,
+                metric_type="deviation",
+                feature_data_type=feature_type,
+                feature_name=feature_name,
+                fancy_feature_label=fancy_feature_label,
+                **kwargs,
+            )
+            if rescale_factor is not None:
+                scale_axis_tick_labels(ax, rescale_factor)
+            if save_dir is not None:
+                file_name = f"binned_deviation_{variable_key}_{feature_name}.pdf"
+                file_path = os.path.join(save_dir, file_name)
+                fig.savefig(file_path)
+            plt.close(fig)
+
+    def plot_neutrino_deviation_evaluation(self, save_dir: Optional[str] = None, **kwargs):
+        """
+        Evaluate and plot neutrino deviation metrics for all reconstructors.
+
+        Args:
+            save_dir: Optional directory to save the results
+            **kwargs: Additional arguments for plotting
+
+        """
+        for coords in ["cartesian", "spherical", "spherical_lepton_fixed"]:
+            fig, ax = self.plot_relative_neutrino_deviations(coords=coords, **kwargs)
+            if save_dir is not None:
+                file_name = f"neutrino_deviation_distributions_{coords}.pdf"
+                file_path = os.path.join(save_dir, file_name)
+                fig.savefig(file_path)
+            plt.close(fig)
+        self.save_regression_error_latex_table(save_dir=os.path.join(save_dir), **kwargs)

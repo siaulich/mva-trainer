@@ -11,7 +11,7 @@ class GroundTruthReconstructor(EventReconstructorBase):
         super().__init__(
             config=config,
             assignment_name=assignment_name,
-            full_reco_name=assignment_name +( r"$\nu^2$-Flows" if use_nu_flows else r"True $\nu$"),
+            full_reco_name=assignment_name +( r" + $\nu^2$-Flows" if use_nu_flows else r" + True $\nu$"),
             neutrino_name= r"$\nu^2$-Flows" if use_nu_flows else r"True $\nu$",
             perform_regression=False, use_nu_flows=use_nu_flows
         )
@@ -26,12 +26,17 @@ class GroundTruthReconstructor(EventReconstructorBase):
 
 class PerfectAssignmentReconstructor(KerasFFRecoBase,GroundTruthReconstructor):
     def __init__(
-        self, config: DataConfig, neutrino_reco_name=  "ML Neutrino Reco",assignment_name="True Assignment",
+        self, config: DataConfig, neutrino_reco_name=  "ML Neutrino Reco",assignment_name="True Assignment", load_model_path=None,
     ):
+        KerasFFRecoBase.__init__(self,
+            name=neutrino_reco_name,
+            config=config,
+            load_model_path=load_model_path,
+        )
         EventReconstructorBase.__init__(self,
             config=config,
             assignment_name=assignment_name,
-            full_reco_name=assignment_name + neutrino_reco_name,
+            full_reco_name=assignment_name + " + " + neutrino_reco_name if assignment_name != "" or neutrino_reco_name != "" else assignment_name + neutrino_reco_name ,
             neutrino_name=neutrino_reco_name,
             perform_regression=True,
             use_nu_flows=False,
@@ -90,6 +95,3 @@ class CompositeNeutrinoComponentReconstructor(KerasFFRecoBase):
         ml_neutrino_reco[:,:,self.axis] = true_neutrino_reco[:,:,self.axis]
 
         return assignment, ml_neutrino_reco
-
-
-        

@@ -95,6 +95,21 @@ class LoadConfig:
             has_event_number=self.mc_event_number is not None,
         )
 
+def load_yaml_config(yaml_path: str) -> dict:
+    """
+    Load a YAML configuration file.
+
+    Args:
+        yaml_path: Path to the YAML configuration file
+    Returns:
+        Dictionary containing the loaded configuration
+    """
+    import yaml
+
+    with open(yaml_path, "r") as f:
+        yaml_dict = yaml.safe_load(f)
+    return yaml_dict
+
 
 def get_load_config_from_yaml(yaml_path: str) -> LoadConfig:
     """
