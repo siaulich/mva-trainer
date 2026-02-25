@@ -1,4 +1,5 @@
-from . import EventReconstructorBase, KerasFFRecoBase
+from .reconstruction_base import EventReconstructorBase
+from .keras_ff_reco_base import KerasFFRecoBase
 import numpy as np
 from core.DataLoader import DataConfig
 from typing import Union
