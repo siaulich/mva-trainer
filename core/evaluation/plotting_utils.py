@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from typing import Tuple, Optional, List
 
-from .evaluator_base import (
+from .evaluator_utils import (
     PlotConfig,
     BinningUtility,
     BootstrapCalculator,

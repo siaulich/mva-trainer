@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from typing import Optional
 from copy import deepcopy
 
-from .evaluator_base import (
+from .evaluator_utils import (
     BootstrapCalculator,
     AccuracyCalculator,
     SelectionAccuracyCalculator,

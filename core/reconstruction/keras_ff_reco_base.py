@@ -39,8 +39,6 @@ class KerasFFRecoBase(EventReconstructorBase, KerasMLWrapper):
         KerasMLWrapper.__init__(
             self, config=config, perform_regression=perform_regression
         )
-        self.model: keras.models.Model = None
-        self.trainable_model: keras.models.Model = None
         if load_model_path is not None:
             self.load_model(load_model_path)
         self.predict_confidence = False
@@ -115,7 +113,6 @@ class KerasFFRecoBase(EventReconstructorBase, KerasMLWrapper):
     def prepare_labels(self, X, y=None, copy_data=True):
         y_train = {}
 
-        # Rename targets to match model output names
         if y is None:
             y_train["assignment"] = X["assignment"]
             y_train["regression"] = X["regression"] if "regression" in y else None

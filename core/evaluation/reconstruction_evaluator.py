@@ -17,7 +17,7 @@ from core.reconstruction import (
 )
 import seaborn as sns
 from core.base_classes import KerasMLWrapper
-from .evaluator_base import (
+from .evaluator_utils import (
     PlotConfig,
     BootstrapCalculator,
     BinningUtility,
