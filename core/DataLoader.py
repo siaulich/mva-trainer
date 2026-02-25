@@ -18,7 +18,7 @@ import yaml
 
 from typing import Optional, Dict, List, Tuple, Union
 
-from .Configs import LoadConfig, DataConfig
+from .configs import LoadConfig, DataConfig
 
 
 class LabelBuilder:

@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from core.Configs import DataConfig
+from core.configs import DataConfig
 
 class BaseUtilityModel(ABC):
     def __init__(self, config: DataConfig, assignment_name = "BaseAssignmentUtility", full_reco_name = "BaseFullRecoUtility", neutrino_name = None):

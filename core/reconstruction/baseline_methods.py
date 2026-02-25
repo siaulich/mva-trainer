@@ -1,4 +1,4 @@
-from .reconstruction_base import EventReconstructorBase
+from ..base_classes.reconstruction_base import EventReconstructorBase
 from core.DataLoader import DataConfig
 import numpy as np
 from core.utils.four_vector_arithmetics import (

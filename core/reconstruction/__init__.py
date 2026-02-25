@@ -10,8 +10,7 @@ methods with support for:
 - Mass resolution calculations
 - Comprehensive visualization tools
 """
-from .reconstruction_base import EventReconstructorBase
-from .BaselineMethods import DeltaRAssigner, ChiSquareAssigner
+from .baseline_methods import DeltaRAssigner, ChiSquareAssigner
 from .ground_truth_reconstructor import GroundTruthReconstructor, PerfectAssignmentReconstructor
 from .keras_ff_reco_base import KerasFFRecoBase
 

@@ -10,7 +10,7 @@ from core.components import (
     ConfidenceLossOutputLayer,
 )
 from core.utils import losses
-from .reconstruction_base import EventReconstructorBase
+from ..base_classes.reconstruction_base import EventReconstructorBase
 
 from copy import deepcopy
 
@@ -177,20 +177,6 @@ class KerasFFRecoBase(EventReconstructorBase, KerasMLWrapper):
         )
 
     def generate_one_hot_encoding(self, predictions, exclusive):
-        """
-        Generates a one-hot encoded array from the model's predictions.
-        This method processes the raw predictions from the model and converts them
-        into a one-hot encoded format, indicating the associations between jets and leptons.
-        Args:
-            predictions (np.ndarray): The raw predictions from the model, typically
-                of shape (batch_size, max_jets, NUM_LEPTONS).
-            exclusive (bool): If True, ensures exclusive assignments between jets
-                and leptons
-        Returns:
-            np.ndarray: A one-hot encoded array of shape (batch_size, max_jets, 2),
-            where the last dimension represents the association between jets and
-            leptons. The value 1 indicates an association, and 0 indicates no association.
-        """
         prediction_product_matrix = predictions[..., 0][:,:,np.newaxis] + predictions[..., 1][:, np.newaxis, ...] # shape (batch_size, max_jets, max_jets)
         if exclusive:
             prediction_product_matrix[:,np.arange(predictions.shape[1]),np.arange(predictions.shape[1])] = 0 # set diagonal to zero to enforce exclusivity
@@ -199,39 +185,9 @@ class KerasFFRecoBase(EventReconstructorBase, KerasMLWrapper):
         one_hot[np.arange(predictions.shape[0]), np.unravel_index(idx, prediction_product_matrix.shape[1:])[0], 0] = 1
         one_hot[np.arange(predictions.shape[0]), np.unravel_index(idx, prediction_product_matrix.shape[1:])[1], 1] = 1
 
-        if False: # old implementation, kept for reference
-            one_hot = np.zeros((predictions.shape[0], self.max_jets, 2), dtype=int)
-            for i in range(predictions.shape[0]):
-                probs = predictions[i].copy()
-                for _ in range(self.NUM_LEPTONS):
-                    jet_index, lepton_index = np.unravel_index(
-                        np.argmax(probs), probs.shape
-                    )
-                    one_hot[i, jet_index, lepton_index] = 1
-                    probs[jet_index, :] = 0
-                    probs[:, lepton_index] = 0
         return one_hot
 
     def predict_indices(self, data: dict[str : np.ndarray], exclusive=True):
-        """
-        Predicts the indices of jets and leptons based on the model's predictions.
-        This method processes the predictions from the model and returns a one-hot
-        encoded array indicating the associations between jets and leptons.
-        Args:
-            data (dict): A dictionary containing input data for prediction. It should
-                include keys "jet_inputs" and "lep_inputs", and optionally "met_inputs" if met
-                features are used by the model.
-            exclusive (bool, optional): If True, ensures exclusive assignments between
-                jets and leptons, where each jet is assigned to at most one lepton and
-                vice versa. Defaults to True.
-        Returns:
-            np.ndarray: A one-hot encoded array of shape (batch_size, max_jets, 2),
-            where the last dimension represents the association between jets and
-            leptons. The value 1 indicates an association, and 0 indicates no association.
-        Raises:
-            ValueError: If the model is not built (i.e., `self.model` is None).
-        """
-
         if self.model is None:
             raise ValueError(
                 "Model not built. Please build the model using build_model() method."
@@ -240,21 +196,6 @@ class KerasFFRecoBase(EventReconstructorBase, KerasMLWrapper):
         return self.complete_forward_pass(data)[0]
 
     def reconstruct_neutrinos(self, data: dict[str : np.ndarray]):
-        """
-        Reconstructs neutrino kinematics based on the model's regression output.
-        This method processes the regression output from the model and returns
-        the reconstructed neutrino kinematics.
-        Args:
-            data (dict): A dictionary containing input data for prediction. It should
-                include keys "jet_inputs" and "lep_inputs", and optionally "met_inputs" if met
-                features are used by the model.
-        Returns:
-            np.ndarray: An array containing the reconstructed neutrino kinematics.
-        Raises:
-            ValueError: If the model is not built (i.e., `self.model` is None) or
-                if regression targets are not specified in the config.
-        """
-
         if self.model is None:
             raise ValueError(
                 "Model not built. Please build the model using build_model() method."
@@ -283,22 +224,6 @@ class KerasFFRecoBase(EventReconstructorBase, KerasMLWrapper):
         return predictions
 
     def complete_forward_pass(self, data: dict[str : np.ndarray]):
-        """
-        Performs a complete forward pass through the model, returning both
-        jet-lepton assignment predictions and neutrino kinematics reconstruction.
-        This method processes the input data through the model and returns
-        both the assignment predictions and the reconstructed neutrino kinematics.
-        Args:
-            data (dict): A dictionary containing input data for prediction. It should
-                include keys "jet_inputs" and "lep_inputs", and optionally "met_inputs" if met
-                features are used by the model.
-        Returns:
-            Tuple[np.ndarray, np.ndarray]: A tuple containing:
-                - A one-hot encoded array of shape (batch_size, max_jets, 2),
-                  representing jet-lepton assignments.
-                - An array containing the reconstructed neutrino kinematics.
-        """
-
         if self.model is None:
             raise ValueError(
                 "Model not built. Please build the model using build_model() method."
@@ -315,34 +240,13 @@ class KerasFFRecoBase(EventReconstructorBase, KerasMLWrapper):
             )
         return assignment_predictions, neutrino_reconstruction
 
-    def evaluate(self, data_dict):
-        assignment_predictions, regression_predictions = self.complete_forward_pass(
-            data_dict
-        )
-        results = {}
-        if "assignment" in data_dict:
-            accuracy = self.compute_accuracy(
-                assignment_predictions, data_dict["assignment"], per_event=False
-            )
-            results["accuracy"] = accuracy
-        if self.perform_regression and "regression" in data_dict:
-            mse = self.compute_regression_mse(
-                regression_predictions, data_dict["regression"]
-            )
-            results["regression_mse"] = mse
-        return results
-
     def adapt_output_layer_scales(self, data):
         if (
             self.perform_regression
             and "normalized_regression" in self.model.output_names
         ):
-            # neutrino_truth_std = np.std(data["regression"], axis=0)
-            # neutrino_truth_mean = np.mean(data["regression"], axis=0)
             denormalisation_layer = keras.layers.Rescaling(
                 scale=1e5,  # Scale neutrinos to 100 GeV by default
-                # offset=neutrino_truth_mean,
-                # scale = neutrino_truth_std,
                 name="regression",
             )
             outputs = self.model.output
