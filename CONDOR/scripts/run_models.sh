@@ -14,8 +14,8 @@ log = logs/job_$(Cluster)_$(ModelName).log
 
 arguments = python3 ../TrainScript.py \
     --output_dir ../models/$(ModelName)/ \
-    --load_config train_regression/load_config.yaml \
-    --train_config train_regression/train_config.yaml \
+    --load_config ../config/nominal_load_config.yaml \
+    --train_config training/train_config.yaml \
     --model_config models/$(ModelName).yaml \
     --event_numbers even 
 
