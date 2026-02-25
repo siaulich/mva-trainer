@@ -4,22 +4,24 @@ import os
 import numpy as np
 import yaml
 from dacite import from_dict, Config
-import tensorflow as tf
 from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Tuple, Any
-from copy import deepcopy
 import matplotlib.pyplot as plt
-plt.rcParams["font.size"] = 18
 
+plt.rcParams["font.size"] = 18
+import matplotlib as mpl
+
+mpl.rcParams["figure.constrained_layout.use"] = True
 from core import DataConfig, LoadConfig, load_yaml_config, get_load_config_from_yaml
 from core.DataLoader import DataPreprocessor
-from core import evaluation,reconstruction
+from core import evaluation, reconstruction
 
 
 @dataclass
 class RecontructorConfig:
     type: str = "KerasFFRecoBase"
     options: Dict[str, Any] = field(default_factory=dict)
+
 
 @dataclass
 class BinningVariableConfig:
@@ -37,6 +39,7 @@ class EvaluationConfig:
     evaluation_event_numbers: str = "odd"
     binning_variables: List[BinningVariableConfig] = field(default_factory=list)
 
+
 def load_evaluation_config(path: str) -> EvaluationConfig:
     with open(path) as f:
         raw = yaml.safe_load(f)
@@ -44,7 +47,7 @@ def load_evaluation_config(path: str) -> EvaluationConfig:
     return from_dict(
         data_class=EvaluationConfig,
         data=raw,
-        config=Config(cast=[tuple])  # converts list → tuple for range
+        config=Config(cast=[tuple]),  # converts list → tuple for range
     )
 
 
@@ -79,6 +82,11 @@ def parse_args():
         default=None,
         help="Directory to save evaluation results (default: ./evaluation_results)",
     )
+    parser.add_argument(
+        "--accuracy",
+        action="store_true",
+        help="Whether to only evaluate and plot accuracy-related metrics (default: False)",
+    )
     return parser.parse_args()
 
 
@@ -91,16 +99,22 @@ if __name__ == "__main__":
 
     # Load data
     data_processor = DataPreprocessor(load_config)
-    data_config = data_processor.load_from_npz(npz_path=load_config.data_path["test"], max_events=args.num_events, event_numbers=evaluation_config.evaluation_event_numbers)
+    data_config = data_processor.load_from_npz(
+        npz_path=load_config.data_path,
+        max_events=args.num_events,
+        event_numbers=evaluation_config.evaluation_event_numbers,
+    )
     X, y = data_processor.get_data()
-    
+    del data_processor
 
     print("Successfully loaded data for evaluation:")
     # Initialize reconstructors based on the evaluation configuration
     reconstructors = []
     for reconstructor_cfg in evaluation_config.reconstructors:
-        reconstructor_cfg.options["config"] = data_config 
-        reconstructor = reconstruction.get_reconstructor(reconstructor_cfg.type)(**reconstructor_cfg.options)
+        reconstructor_cfg.options["config"] = data_config
+        reconstructor = reconstruction.get_reconstructor(reconstructor_cfg.type)(
+            **reconstructor_cfg.options
+        )
         reconstructors.append(reconstructor)
         print(f"Initialized reconstructor: {reconstructor_cfg.type}")
 
@@ -120,23 +134,33 @@ if __name__ == "__main__":
     os.makedirs(accuracy_directory, exist_ok=True)
     neutrino_deviation_directory = os.path.join(output_dir, "neutrino_deviations")
     os.makedirs(neutrino_deviation_directory, exist_ok=True)
+    distributions_directory = os.path.join(output_dir, "distributions")
+    os.makedirs(distributions_directory, exist_ok=True)
     binned_performance_directory = os.path.join(output_dir, "binned_performance")
     os.makedirs(binned_performance_directory, exist_ok=True)
 
-    evaluator.plot_all_deviations(save_dir=deviation_directory)
-    print(f"Saved all deviation evaluation plots to {deviation_directory}")
-    evaluator.plot_all_confusion_matrices(save_dir=confusion_matrix_directory)
-    print(f"Saved all confusion matrix plots to {confusion_matrix_directory}")
+    if not args.accuracy:
+        evaluator.plot_all_deviations(save_dir=deviation_directory)
+        print(f"Saved all deviation evaluation plots to {deviation_directory}")
+        evaluator.plot_all_distributions(save_dir=distributions_directory)
+        print(f"Saved all distribution plots to {distributions_directory}")
+        evaluator.plot_all_confusion_matrices(save_dir=confusion_matrix_directory)
+        print(f"Saved all confusion matrix plots to {confusion_matrix_directory}")
+        evaluator.plot_neutrino_deviation_evaluation(save_dir=neutrino_deviation_directory)
+        print(
+            f"Saved all neutrino deviation evaluation plots to {neutrino_deviation_directory}"
+        )
     evaluator.plot_accuracy_evaluation(save_dir=accuracy_directory)
     print(f"Saved all accuracy evaluation plots to {accuracy_directory}")
-    evaluator.plot_neutrino_deviation_evaluation(save_dir=neutrino_deviation_directory)
-    print(f"Saved all neutrino deviation evaluation plots to {neutrino_deviation_directory}")
-    for idx,binning_cfg in enumerate(evaluation_config.binning_variables):
-        binned_variable_output_dir = os.path.join(binned_performance_directory, f"{binning_cfg.feature_name}")
+    for idx, binning_cfg in enumerate(evaluation_config.binning_variables):
+        binned_variable_output_dir = os.path.join(
+            binned_performance_directory, f"{binning_cfg.feature_name}"
+        )
         os.makedirs(binned_variable_output_dir, exist_ok=True)
         evaluator.plot_binned_performance_evaluation(
-            **binning_cfg.__dict__,
-            save_dir=binned_variable_output_dir
+            **binning_cfg.__dict__, save_dir=binned_variable_output_dir, accuracy_only=args.accuracy
         )
-        print(f"Saved binned performance evaluation plots for {binning_cfg.feature_name} to {binned_variable_output_dir} [{idx + 1}/{len(evaluation_config.binning_variables)}]")
+        print(
+            f"Saved binned performance evaluation plots for {binning_cfg.feature_name} to {binned_variable_output_dir} [{idx + 1}/{len(evaluation_config.binning_variables)}]"
+        )
     print(f"Saved all evaluation plots to {output_dir}")

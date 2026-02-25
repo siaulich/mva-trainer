@@ -60,7 +60,7 @@ class AccuracyPlotter:
         )
         ax.set_ylim(0, 1)
         ax.grid(axis="y", alpha=config.alpha)
-        fig.tight_layout()
+        
 
         return fig, ax
 
@@ -132,7 +132,7 @@ class AccuracyPlotter:
             title += f" ({config.confidence*100:.0f}% CI)"
         ax.set_title(title)
 
-        fig.tight_layout()
+        
         return fig, ax
 
     @staticmethod
@@ -185,7 +185,7 @@ class AccuracyPlotter:
         ax.legend(loc="best")
         ax.grid(alpha=0.3)
 
-        fig.tight_layout()
+        
         return fig, ax
 
 
@@ -236,7 +236,7 @@ class SelectionAccuracyPlotter:
         )
         ax.set_ylim(0, 1)
         ax.grid(axis="y", alpha=config.alpha)
-        fig.tight_layout()
+        
 
         return fig, ax
 
@@ -307,7 +307,7 @@ class SelectionAccuracyPlotter:
             title += f" ({config.confidence*100:.0f}% CI)"
         ax.set_title(title)
 
-        fig.tight_layout()
+        
         return fig, ax
 
 
@@ -377,7 +377,7 @@ class ConfusionMatrixPlotter:
         for j in range(i + 1, len(axes)):
             fig.delaxes(axes[j])
         fig.suptitle("Confusion Matrix")
-        fig.tight_layout()
+        
         return fig, axes[: i + 1]
 
     @staticmethod
@@ -508,7 +508,7 @@ class ResolutionPlotter:
             title += f" ({config.confidence*100:.0f}% CI)"
         ax.set_title(title)
 
-        fig.tight_layout()
+        
         return fig, ax
 
 
@@ -559,7 +559,7 @@ class NeutrinoDeviationPlotter:
         )
         ax.set_ylim(0, None)
         ax.grid(axis="y", alpha=config.alpha)
-        fig.tight_layout()
+        
 
         return fig, ax
 
@@ -628,7 +628,7 @@ class NeutrinoDeviationPlotter:
             title += f" ({config.confidence*100:.0f}% CI)"
         ax.set_title(title)
 
-        fig.tight_layout()
+        
         return fig, ax
 
     @staticmethod
@@ -755,7 +755,7 @@ class NeutrinoDeviationPlotter:
             ax_bottom.legend(loc="best")
 
         fig.suptitle("Neutrino Component Relative Deviation Distribution", fontsize=14)
-        fig.tight_layout()
+        
         return fig, axes
 
     @staticmethod
@@ -843,7 +843,7 @@ class NeutrinoDeviationPlotter:
         ax.grid(alpha=0.3)
         ax.legend(loc="best")
 
-        fig.tight_layout()
+        
         return fig, ax
 
 

@@ -114,8 +114,9 @@ class InputMetLayer(keras.layers.Layer):
     to (met_x, met_y).
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self,log_variables=True, **kwargs):
         super().__init__(**kwargs)
+        self.log_variables = log_variables
 
     def call(self, inputs):
         met = inputs[..., 0:1]
@@ -124,10 +125,19 @@ class InputMetLayer(keras.layers.Layer):
         log_met = tf.math.log(tf.where(met > 0, met, tf.ones_like(met) * 1e-6))
         met_cos_phi = tf.cos(met_phi)
         met_sin_phi = tf.sin(met_phi)
-        return tf.concat([log_met, met_cos_phi, met_sin_phi], axis=-1)
+        output_tensors = [log_met, met_cos_phi, met_sin_phi]
+        if self.log_variables:
+            output_tensors.append(met)
+
+        return tf.concat(output_tensors, axis=-1)
 
     def get_config(self):
         config = super().get_config()
+        config.update(
+            {
+                "log_variables": self.log_variables,
+            }
+        )
         return config
 
 
@@ -141,9 +151,11 @@ class ProcessPtEtaPhiELayer(keras.layers.Layer):
         padding_value (float): The value to use for padding masked entries.
     """
 
-    def __init__(self, padding_value, **kwargs):
+    def __init__(self, padding_value, log_variables = True, **kwargs):
         super().__init__(**kwargs)
         self.padding_value = padding_value
+        self.log_variables = log_variables
+
 
     def call(self, inputs, mask=None):
         # Split input features
@@ -176,16 +188,23 @@ class ProcessPtEtaPhiELayer(keras.layers.Layer):
         safe_cos_phi = tf.cos(safe_phi)
         safe_sin_phi = tf.sin(safe_phi)
 
-        # Concatenate outputs
-        outputs = tf.concat(
-            [
+        output_tensors = [
                 safe_log_pt,
                 safe_eta,
                 safe_cos_phi,
                 safe_sin_phi,
                 safe_log_energy,
-                residual,
-            ],
+            ]
+
+        if self.log_variables:
+            output_tensors.extend([safe_energy, safe_pt])
+
+        output_tensors.append(residual)
+
+
+        # Concatenate outputs
+        outputs = tf.concat(
+            output_tensors,
             axis=-1,
         )
         # If mask exists, restore masked entries to padding value
@@ -200,6 +219,7 @@ class ProcessPtEtaPhiELayer(keras.layers.Layer):
         config.update(
             {
                 "padding_value": self.padding_value,
+                "log_variables": self.log_variables,
             }
         )
         return config

@@ -229,7 +229,15 @@ class KerasFFRecoBase(EventReconstructorBase, KerasMLWrapper):
             where the last dimension represents the association between jets and
             leptons. The value 1 indicates an association, and 0 indicates no association.
         """
+        prediction_product_matrix = predictions[..., 0][:,:,np.newaxis] + predictions[..., 1][:, np.newaxis, ...] # shape (batch_size, max_jets, max_jets)
         if exclusive:
+            prediction_product_matrix[:,np.arange(predictions.shape[1]),np.arange(predictions.shape[1])] = 0 # set diagonal to zero to enforce exclusivity
+        one_hot = np.zeros((predictions.shape[0], self.max_jets, self.NUM_LEPTONS), dtype=int)
+        idx = np.argmax(prediction_product_matrix.reshape(predictions.shape[0], -1), axis=1)
+        one_hot[np.arange(predictions.shape[0]), np.unravel_index(idx, prediction_product_matrix.shape[1:])[0], 0] = 1
+        one_hot[np.arange(predictions.shape[0]), np.unravel_index(idx, prediction_product_matrix.shape[1:])[1], 1] = 1
+
+        if False: # old implementation, kept for reference
             one_hot = np.zeros((predictions.shape[0], self.max_jets, 2), dtype=int)
             for i in range(predictions.shape[0]):
                 probs = predictions[i].copy()
@@ -240,17 +248,6 @@ class KerasFFRecoBase(EventReconstructorBase, KerasMLWrapper):
                     one_hot[i, jet_index, lepton_index] = 1
                     probs[jet_index, :] = 0
                     probs[:, lepton_index] = 0
-        else:
-            one_hot[
-                np.arange(predictions.shape[0]),
-                np.argmax(predictions[:, :, 0], axis=1),
-                0,
-            ] = 1
-            one_hot[
-                np.arange(predictions.shape[0]),
-                np.argmax(predictions[:, :, 1], axis=1),
-                1,
-            ] = 1
         return one_hot
 
     def predict_indices(self, data: dict[str : np.ndarray], exclusive=True):

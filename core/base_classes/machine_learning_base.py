@@ -198,12 +198,14 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
         transformed_jet_inputs = ProcessPtEtaPhiELayer(
             name="jet_input_transform",
             padding_value=self.padding_value,
+            log_variables=log_variables,
         )(jet_inputs)
         transformed_lep_inputs = ProcessPtEtaPhiELayer(
             name="lep_input_transform",
             padding_value=self.padding_value,
+            log_variables=log_variables,
         )(lep_inputs)
-        transformed_met_inputs = InputMetLayer(name="met_input_transform")(met_inputs)
+        transformed_met_inputs = InputMetLayer(name="met_input_transform", log_variables=log_variables)(met_inputs)
 
         if compute_HLF:
             high_level_features = ComputeHighLevelFeatures_from_PtEtaPhiE(

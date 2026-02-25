@@ -197,11 +197,12 @@ class PtEtaPhiLoss(keras.losses.Loss):
         p_t = tf.sqrt(px_t * px_t + py_t * py_t + pz_t * pz_t + self.eps)
         p_p = tf.sqrt(px_p * px_p + py_p * py_p + pz_p * pz_p + self.eps)
 
+        # transverse momenta
         pt_t = tf.sqrt(px_t * px_t + py_t * py_t + self.eps)
         pt_p = tf.sqrt(px_p * px_p + py_p * py_p + self.eps)
 
-        # -------- Stable pt loss (scale invariant, no log)
-        loss_pt = tf.square((pt_t - pt_p) / (pt_t + pt_p + self.eps))
+        # -------- Stable pt loss (scale invariant)
+        loss_pt = tf.square((pt_t - pt_p) / (pt_t + self.eps))
 
         # -------- Stable "eta" loss via z-direction
         zdir_t = pz_t / p_t
@@ -257,7 +258,7 @@ class MagnitudeDirectionLoss(keras.losses.Loss):
         mag_pred = tf.norm(y_pred, axis=-1)  # (batch, 2)
 
         mag_loss = tf.square(
-            (mag_true - mag_pred) / (mag_true + mag_pred + self.epsilon)
+            (mag_true - mag_pred) / (mag_true + self.epsilon)
         )  # (batch, 2)
         mag_loss = tf.reduce_mean(mag_loss, axis=-1)  # (batch,)
 

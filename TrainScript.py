@@ -107,11 +107,14 @@ if __name__ == "__main__":
 
     data_preprocessor = DataPreprocessor(load_config)
     data_config = data_preprocessor.load_from_npz(
-        load_config.data_path["nominal"],
+        load_config.data_path,
         event_numbers=args.event_numbers,
         max_events=args.max_events,
     )
     X, y = data_preprocessor.get_data()
+    num_events = X["jet_inputs"].shape[0]
+
+    print(f"Data loaded. Using {num_events} events for training.")
 
     model = keras_models._get_model(model_config.model_type)
     model = model(data_config)

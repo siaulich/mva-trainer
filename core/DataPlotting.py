@@ -95,7 +95,7 @@ class DataPlotter:
         ax.set_xticklabels(feature_names, rotation=90)
         ax.set_yticklabels(feature_names)
         ax.set_title("Feature Correlation Matrix", pad=20)
-        fig.tight_layout()
+        
         fig.savefig(os.path.join(self.plots_dir, "feature_correlation_matrix.pdf"))
         return fig, ax
 

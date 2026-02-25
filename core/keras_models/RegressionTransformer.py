@@ -37,6 +37,7 @@ class FullRecoTransformer(KerasFFRecoBase):
         num_heads=8,
         use_global_event_inputs=False,
         compute_HLF=True,
+        log_variables=False,
     ):
         """
         Builds the Assignment Transformer model.
@@ -49,13 +50,14 @@ class FullRecoTransformer(KerasFFRecoBase):
             keras.Model: The constructed Keras model.
         """
         normed_inputs, masks = self._prepare_inputs(
-            use_global_event_inputs=use_global_event_inputs,compute_HLF=compute_HLF
+            use_global_event_inputs=use_global_event_inputs,
+            compute_HLF=compute_HLF,
+            log_variables=log_variables,
         )
         normed_jet_inputs = normed_inputs["jet_inputs"]
         normed_lep_inputs = normed_inputs["lepton_inputs"]
         normed_met_inputs = normed_inputs["met_inputs"]
         jet_mask = masks["jet_mask"]
-
 
         # Embed jets
         jet_embeddings = MLP(
@@ -112,13 +114,11 @@ class FullRecoTransformer(KerasFFRecoBase):
         # Assignment Head
         jet_assignment_output = MLP(
             output_dim=hidden_dim,
-            dropout_rate=dropout_rate,
             name="jet_assignment_mlp",
             num_layers=2,
         )(jet_outputs)
         lepton_assignment_output = MLP(
             output_dim=hidden_dim,
-            dropout_rate=dropout_rate,
             name="lepton_assignment_mlp",
             num_layers=2,
         )(lepton_outputs)
@@ -149,7 +149,6 @@ class FullRecoTransformer(KerasFFRecoBase):
         )(regression_outputs)
         regression_outputs = MLP(
             output_dim=3 * self.NUM_LEPTONS,
-            dropout_rate=dropout_rate,
             name="regression_head_mlp",
             num_layers=4,
         )(regression_outputs)
@@ -164,13 +163,9 @@ class FullRecoTransformer(KerasFFRecoBase):
         )
 
 
-class FeatureConcatTransformerReconstructor(KerasFFRecoBase):
+class FeatureConcatReconstructor(KerasFFRecoBase):
     def __init__(
-        self,
-        config,
-        name="FeatureConcatTransformer",
-        use_nu_flows=False,
-        perform_regression=True,
+        self, config, name="Transformer", use_nu_flows=False, perform_regression=True
     ):
         super().__init__(
             config,
@@ -187,7 +182,7 @@ class FeatureConcatTransformerReconstructor(KerasFFRecoBase):
         num_heads=8,
         compute_HLF=True,
         use_global_event_inputs=False,
-        log_variables=True,
+        log_variables=False,
     ):
         """
         Builds the Assignment Transformer model.
@@ -219,7 +214,7 @@ class FeatureConcatTransformerReconstructor(KerasFFRecoBase):
                 [normed_jet_inputs, flat_normed_HLF_inputs]
             )
 
-        if self.config.has_global_event_inputs:
+        if "global_event_inputs" in normed_inputs:
             normed_global_event_inputs = normed_inputs["global_event_inputs"]
             flatted_global_event_inputs = keras.layers.Flatten()(
                 normed_global_event_inputs
@@ -244,20 +239,26 @@ class FeatureConcatTransformerReconstructor(KerasFFRecoBase):
             [normed_jet_inputs, met_repeated_jets, lepton_repeated_jets]
         )
 
+        # Input embedding layers
         jet_embedding = MLP(
-            hidden_dim, num_layers=4, name="concat_vector_embedding_mlp"
+            hidden_dim,
+            num_layers=3,
+            dropout_rate=dropout_rate,
+            activation="relu",
+            name="jet_embedding",
         )(jet_features)
 
-        x = jet_embedding
+        # Transformer layers
+        jets_transformed = jet_embedding
         for i in range(num_layers):
-            x = SelfAttentionBlock(
+            jets_transformed = SelfAttentionBlock(
                 num_heads=num_heads,
                 key_dim=hidden_dim,
                 dropout_rate=dropout_rate,
-                name=f"central_sfa_{i}",
-            )(x, jet_mask)
+                name=f"jets_self_attention_{i}",
+                pre_ln=True,
+            )(jets_transformed, mask=jet_mask)
 
-        jets_transformed = x
         # Output layers
         jet_output_embedding = MLP(
             self.NUM_LEPTONS,
@@ -266,30 +267,41 @@ class FeatureConcatTransformerReconstructor(KerasFFRecoBase):
             name="jet_output_embedding",
         )(jets_transformed)
 
+        attention_pooling = PoolingAttentionBlock(
+            num_heads=num_heads,
+            key_dim=hidden_dim,
+            num_seeds=1,
+            dropout_rate=dropout_rate,
+            name="attention_pooling",
+        )(jets_transformed, mask=jet_mask)
+        attention_pooling = keras.layers.Flatten()(attention_pooling)
+        regression_outputs = keras.layers.Concatenate(name="regression_concat")(
+            [attention_pooling]
+        )
+
+        regression_outputs = MLP(
+            output_dim=hidden_dim,
+            dropout_rate=dropout_rate,
+            name="regression_hidden_mlp",
+            num_layers=3,
+        )(regression_outputs)
+        regression_outputs = MLP(
+            output_dim=3 * self.NUM_LEPTONS,
+            name="regression_head_mlp",
+            num_layers=2,
+        )(regression_outputs)
+
+        regression_outputs = keras.layers.Reshape(
+            (-1, 3), name="normalized_regression"
+        )(regression_outputs)
+
         jet_assignment_probs = TemporalSoftmax(axis=1, name="assignment")(
             jet_output_embedding, mask=jet_mask
         )
 
-        neutrino_output_projection = MLP(
-            output_dim=hidden_dim, name="neutrino_output_projection"
-        )(jet_output_embedding)
-
-        neutrino_output_pooling = PoolingAttentionBlock(
-            key_dim=hidden_dim, num_seeds=self.NUM_LEPTONS, dropout_rate=dropout_rate
-        )(neutrino_output_projection)
-
-        x = neutrino_output_pooling
-        for i in range(num_layers):
-            x = SelfAttentionBlock(
-                num_heads=num_heads,
-                key_dim=hidden_dim,
-                dropout_rate=dropout_rate,
-                name=f"regression_sfa_{i}",
-            )(x)
-
-        regression_output = MLP(output_dim=3, name="normalized_regression")(x)
-
+        # Confidence score output (optional)
         self._build_model_base(
-            jet_assignment_probs,
-            regression_output,
+            jet_assignment_probs=jet_assignment_probs,
+            regression_output=regression_outputs,
+            name="FeatureConcatTransformerModel",
         )

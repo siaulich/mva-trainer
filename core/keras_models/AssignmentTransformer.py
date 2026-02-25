@@ -15,7 +15,7 @@ from core.components import (
     ConcatLeptonCharge,
     ExpandJetMask,
     SplitTransformerOutput,
-    StopGradientLayer
+    StopGradientLayer,
 )
 
 from core import DataConfig
@@ -46,7 +46,9 @@ class CrossAttentionAssigner(KerasFFRecoBase):
             keras.Model: The constructed Keras model.
         """
         # Input layers
-        normed_inputs, masks = self._prepare_inputs(log_variables=log_variables, compute_HLF=compute_HLF)
+        normed_inputs, masks = self._prepare_inputs(
+            log_variables=log_variables, compute_HLF=compute_HLF
+        )
 
         normed_jet_inputs = normed_inputs["jet_inputs"]
         normed_lep_inputs = normed_inputs["lepton_inputs"]
@@ -153,7 +155,7 @@ class CrossAttentionAssigner(KerasFFRecoBase):
 
 
 class FeatureConcatAssigner(KerasFFRecoBase):
-    def __init__(self, config: DataConfig, name="CrossAttentionModel"):
+    def __init__(self, config: DataConfig, name="FeatureConcatModel"):
         super().__init__(config, name=name)
         self.perform_regression = False
 
@@ -198,7 +200,7 @@ class FeatureConcatAssigner(KerasFFRecoBase):
                 [normed_jet_inputs, flat_normed_HLF_inputs]
             )
 
-        if self.config.has_global_event_inputs:
+        if "global_event_inputs" in normed_inputs:
             normed_global_event_inputs = normed_inputs["global_event_inputs"]
             flatted_global_event_inputs = keras.layers.Flatten()(
                 normed_global_event_inputs
@@ -258,7 +260,9 @@ class FeatureConcatAssigner(KerasFFRecoBase):
         confidence_score = None
         # Confidence score output (optional)
         if predict_confidence:
-            confidence_extraction = StopGradientLayer(name="confidence_extraction")(jets_transformed)
+            confidence_extraction = StopGradientLayer(name="confidence_extraction")(
+                jets_transformed
+            )
             pooling = PoolingAttentionBlock(
                 num_heads=num_heads,
                 num_seeds=1,
@@ -272,21 +276,23 @@ class FeatureConcatAssigner(KerasFFRecoBase):
                 activation="sigmoid",
                 name="confidence_score_mlp",
             )(pooling)
-            confidence_score = keras.layers.Flatten(name="confidence_score")(confidence_score)
-
+            confidence_score = keras.layers.Flatten(name="confidence_score")(
+                confidence_score
+            )
 
         self._build_model_base(
-            jet_assignment_probs, confidence_score=confidence_score, name="FeatureConcatTransformerModel"
+            jet_assignment_probs,
+            confidence_score=confidence_score,
+            name="FeatureConcatTransformerModel",
         )
 
 
 class TransformerAssigner(KerasFFRecoBase):
-    def __init__(
-        self, config, name="Transformer"):
+    def __init__(self, config, name="Transformer"):
         super().__init__(
             config,
             name=name,
-            perform_regression=False ,
+            perform_regression=False,
             use_nu_flows=True,
         )
 
@@ -298,6 +304,7 @@ class TransformerAssigner(KerasFFRecoBase):
         num_heads=8,
         use_global_event_inputs=False,
         compute_HLF=True,
+        log_variables=False,
     ):
         """
         Builds the Assignment Transformer model.
@@ -310,13 +317,12 @@ class TransformerAssigner(KerasFFRecoBase):
             keras.Model: The constructed Keras model.
         """
         normed_inputs, masks = self._prepare_inputs(
-            use_global_event_inputs=use_global_event_inputs,compute_HLF=compute_HLF
+            use_global_event_inputs=use_global_event_inputs, compute_HLF=compute_HLF, log_variables=log_variables
         )
         normed_jet_inputs = normed_inputs["jet_inputs"]
         normed_lep_inputs = normed_inputs["lepton_inputs"]
         normed_met_inputs = normed_inputs["met_inputs"]
         jet_mask = masks["jet_mask"]
-
 
         # Embed jets
         jet_embeddings = MLP(
@@ -373,13 +379,11 @@ class TransformerAssigner(KerasFFRecoBase):
         # Assignment Head
         jet_assignment_output = MLP(
             output_dim=hidden_dim,
-            dropout_rate=dropout_rate,
             name="jet_assignment_mlp",
             num_layers=2,
         )(jet_outputs)
         lepton_assignment_output = MLP(
             output_dim=hidden_dim,
-            dropout_rate=dropout_rate,
             name="lepton_assignment_mlp",
             num_layers=2,
         )(lepton_outputs)
