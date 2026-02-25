@@ -33,6 +33,7 @@ class KerasFFRecoBase(EventReconstructorBase, KerasMLWrapper):
                 if perform_regression
                 else name + (r" + $\nu^2$-Flows" if use_nu_flows else r" + True $\nu$")
             ),
+            neutrino_name=name,
             perform_regression=perform_regression,
             use_nu_flows=use_nu_flows,
         )

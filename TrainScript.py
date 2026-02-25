@@ -126,23 +126,28 @@ if __name__ == "__main__":
 
     model.adapt_normalization_layers(X)
 
-    model.compile_model(
-        optimizer=keras.optimizers.get(model_config.compile_options["optimizer"]),
-        loss={
+    compile_options = model_config.compile_options
+
+    losses = {
             key: getattr(utils, value["class_name"])(**value.get("config", {}))
             for key, value in model_config.compile_options["loss"].items()
-        },
-        metrics={
+        }
+    compile_options.pop("loss", None)
+    metrics = {
             key: [
                 getattr(utils, metric["class_name"])(**metric.get("config", {}))
                 for metric in value
             ]
             for key, value in model_config.compile_options["metrics"].items()
         },
-        loss_weights=model_config.compile_options.get("loss_weights", None),
-        add_physics_informed_loss=model_config.compile_options.get(
-            "add_physics_informed_loss", False
-        ),
+    compile_options.pop("metrics", None)
+
+
+    model.compile_model(
+        optimizer=keras.optimizers.get(model_config.compile_options["optimizer"]),
+        loss=losses,
+        metrics=metrics,
+        **compile_options,
     )
 
     train_options = deepcopy(train_config.__dict__)
