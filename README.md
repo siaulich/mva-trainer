@@ -16,33 +16,9 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-## Overview
-This repository contains a standalone analysis framework for training and evaluating machine learning models on dileptonic ttbar events.
-
-## Feature Overview
-
-- **Preprocessing**: The preprocessing pipeline is defined in `core/RootPreprocessor.py` and can output to either ROOT or NPZ format for fast I/O. See [Preprocessing](#preprocessing) for details.
-- **Data Loading**: The data loading and preprocessing is done using the `DataPreprocessor` class, which is defined in the `core/DataLoader.py` file. This class is used to load the data from preprocessed files and arrange it in a format that can be used for training and evaluation.
-- **Reconstruction Models**: The reconstruction models are defined in the `core/reconstruction` directory. The base class for all reconstruction models is the `BaseReconstructor` class, which is defined in the `core/reconstruction/Reconstruction.py` file. Machine learning-based reconstruction models are to be implemented by inheriting from the `KerasFFRecoBase` class, while baseline reconstruction models are to be implemented by inheriting from the `BaselineReconstructor` class.
-- **Model Training**: The training of the models is handled by the `KerasFFRecoBase` class which provides methods for training and evaluating machine learning-based reconstruction models.
-- **Evaluation**: The evaluation of the models is done using the `ReconstructionPlotter` class, which is defined in the `core/reconstruction/Evaluation.py` file. This class provides methods for evaluating the performance of various reconstruction models using different metrics and visualizations.
-- **Export Models for use in TopCPToolKit**: The trained machine learning models can be exported for use in the TopCPToolKit. The `export_to_onnx` method in the `KerasMLWrapper` class is used to export the trained model to a format that can be used in the TopCPToolKit.
-- **Condor Integration**: The framework includes integration with the Condor job scheduler for distributed training and evaluation. The Condor scripts are located in the `CONDOR` directory.
-
 ## Preprocessing
-The preprocessing is now implemented in **pure Python**  and is defined in `core/RootPreprocessor.py`. The Python implementation provides all functionality of the previous C++ preprocessor plus additional features like NPZ output format for faster I/O.
-
-### Quick Start
-
-### Features
-
-The preprocessing pipeline performs:
-1. Event pre-selection (lepton/jet multiplicities, charge requirements, truth matching)
-2. Particle ordering (leptons by charge, jets by pT)
-3. Derived feature computation (invariant masses, ΔR, etc.)
-4. Truth information extraction (top/anti-top, neutrinos, ttbar system)
-5. Optional NuFlow neutrino reconstruction results
-6. Optional initial parton information
+The preprocessing is now implemented in  and is defined in `core/RootPreprocessor.py`. 
+The `RootPreprocessor` class handles the preprocessing of the data and can output to either ROOT or NPZ format for fast I/O. The preprocessing pipeline includes steps such as feature engineering and handling of missing values. The preprocessed data can then be used for training and evaluation of the reconstruction models.
 
 
 ## Data Loading
@@ -50,7 +26,7 @@ The `DataPreprocessor` class (in `core/DataLoader.py`) handles loading preproces
 
 
 ## Machine Learning Models
-Machine learning-based reconstruction models are to be implemented by inheriting from the `KerasMLWrapper` class, which is defined in the `core/base_classes/keras_ml_wrapper.py` file. This class provides the basic funcationality for machine learning-based reconstruction models.
+Machine learning-based reconstruction models can be implemented by inheriting from the `KerasMLWrapper` class, which is defined in the `core/base_classes/keras_ml_wrapper.py` file. This class provides the basic funcationality for machine learning-based reconstruction models.
 
 
 ### Model Architectures
