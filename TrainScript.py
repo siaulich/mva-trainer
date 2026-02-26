@@ -10,8 +10,7 @@ from dataclasses import dataclass, field
 from typing import Optional, List, Dict, Tuple
 from copy import deepcopy
 
-from core import keras_models
-from core import utils
+from core import keras_models, utils
 from core.DataLoader import (
     DataPreprocessor,
     DataConfig,
@@ -68,14 +67,12 @@ def parse_args():
         required=True,
         help="Directory to save trained models and logs",
     )
-
     parser.add_argument(
         "--event_numbers",
         type=str,
         default="all",
         help="Comma-separated list of event numbers to use for training (optional)",
     )
-
     parser.add_argument(
         "--max_events",
         type=int,
@@ -126,19 +123,19 @@ if __name__ == "__main__":
     compile_options = model_config.compile_options
 
     losses = {
-            key: getattr(utils, value["class_name"])(**value.get("config", {}))
-            for key, value in compile_options["loss"].items()
-        }
+        key: getattr(utils, value["class_name"])(**value.get("config", {}))
+        for key, value in compile_options["loss"].items()
+    }
     compile_options.pop("loss", None)
     metrics = {
-            key: [
-                getattr(utils, metric["class_name"])(**metric.get("config", {}))
-                for metric in value
-            ]
-            for key, value in compile_options["metrics"].items()
-        }
+        key: [
+            getattr(utils, metric["class_name"])(**metric.get("config", {}))
+            for metric in value
+        ]
+        for key, value in compile_options["metrics"].items()
+    }
     compile_options.pop("metrics", None)
-    optimizer=keras.optimizers.get(compile_options["optimizer"])
+    optimizer = keras.optimizers.get(compile_options["optimizer"])
     compile_options.pop("optimizer", None)
     model.compile_model(
         optimizer=optimizer,
