@@ -12,6 +12,11 @@ from copy import deepcopy
 
 from core import keras_models
 from core import utils
+from core.DataLoader import (
+    DataPreprocessor,
+    DataConfig,
+    LoadConfig,
+)
 
 
 @dataclass
@@ -30,13 +35,6 @@ class ModelConfig:
     model_options: Dict[str, any] = field(default_factory=dict)
     model_params: Dict[str, any] = field(default_factory=dict)
     compile_options: Dict[str, any] = field(default_factory=dict)
-
-
-from core.DataLoader import (
-    DataPreprocessor,
-    DataConfig,
-    LoadConfig,
-)
 
 
 def parse_args():
@@ -116,8 +114,7 @@ if __name__ == "__main__":
 
     print(f"Data loaded. Using {num_events} events for training.")
 
-    model = keras_models._get_model(model_config.model_type)
-    model = model(data_config)
+    model = keras_models._get_model(model_config.model_type)(data_config)
 
     build_options = model_config.model_options
     build_options.update(**model_config.model_params)
