@@ -1763,7 +1763,7 @@ class ReconstructionPlotter:
             handles,
             labels,
             loc="center",
-            bbox_to_anchor=(0.5, 1.04),
+            #bbox_to_anchor=(0.5, 1.04),
             ncol=len(names),
         )
 
