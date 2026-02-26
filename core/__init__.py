@@ -1,4 +1,4 @@
-from .Configs import DataConfig, LoadConfig, load_yaml_config, get_load_config_from_yaml
+from .configs import DataConfig, LoadConfig, load_yaml_config, get_load_config_from_yaml
 
 try:
     import tensorflow as tf

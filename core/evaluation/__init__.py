@@ -1,6 +1,6 @@
 from .ml_evaluator import MLEvaluator, FeatureImportanceCalculator
 from .reconstruction_evaluator import ReconstructionPlotter, PredictionManager, ReconstructionVariableHandler
-from .evaluator_base import (
+from .evaluator_utils import (
     PlotConfig,
     BootstrapCalculator,
     BinningUtility,

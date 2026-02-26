@@ -107,11 +107,14 @@ if __name__ == "__main__":
 
     data_preprocessor = DataPreprocessor(load_config)
     data_config = data_preprocessor.load_from_npz(
-        load_config.data_path["nominal"],
+        load_config.data_path,
         event_numbers=args.event_numbers,
         max_events=args.max_events,
     )
     X, y = data_preprocessor.get_data()
+    num_events = X["jet_inputs"].shape[0]
+
+    print(f"Data loaded. Using {num_events} events for training.")
 
     model = keras_models._get_model(model_config.model_type)
     model = model(data_config)
@@ -123,23 +126,28 @@ if __name__ == "__main__":
 
     model.adapt_normalization_layers(X)
 
-    model.compile_model(
-        optimizer=keras.optimizers.get(model_config.compile_options["optimizer"]),
-        loss={
+    compile_options = model_config.compile_options
+
+    losses = {
             key: getattr(utils, value["class_name"])(**value.get("config", {}))
             for key, value in model_config.compile_options["loss"].items()
-        },
-        metrics={
+        }
+    compile_options.pop("loss", None)
+    metrics = {
             key: [
                 getattr(utils, metric["class_name"])(**metric.get("config", {}))
                 for metric in value
             ]
             for key, value in model_config.compile_options["metrics"].items()
         },
-        loss_weights=model_config.compile_options.get("loss_weights", None),
-        add_physics_informed_loss=model_config.compile_options.get(
-            "add_physics_informed_loss", False
-        ),
+    compile_options.pop("metrics", None)
+
+
+    model.compile_model(
+        optimizer=keras.optimizers.get(model_config.compile_options["optimizer"]),
+        loss=losses,
+        metrics=metrics,
+        **compile_options,
     )
 
     train_options = deepcopy(train_config.__dict__)

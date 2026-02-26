@@ -137,7 +137,7 @@ def plot_grid_search_results(df, output_dir):
     ax.set_title("Best Validation Loss by Hyperparameters")
     ax.set_ylabel("Transformer Stack Size")
     ax.set_xlabel("Embedding Dimension")
-    fig.tight_layout()
+    
     fig.savefig(os.path.join(output_dir, "grid_search_loss_heatmap.pdf"), dpi=150)
     plt.close()
 
@@ -154,7 +154,7 @@ def plot_grid_search_results(df, output_dir):
         ax.set_title("Best Validation Accuracy by Hyperparameters")
         ax.set_ylabel("Transformer Stack Size")
         ax.set_xlabel("Embedding Dimension")
-        fig.tight_layout()
+        
         fig.savefig(
             os.path.join(output_dir, "grid_search_accuracy_heatmap.pdf"), dpi=150
         )
@@ -173,7 +173,7 @@ def plot_grid_search_results(df, output_dir):
         ax.set_title("Trainable Parameters by Hyperparameters")
         ax.set_ylabel("Transformer Stack Size")
         ax.set_xlabel("Embedding Dimension")
-        fig.tight_layout()
+        
         fig.savefig(os.path.join(output_dir, "grid_search_params_heatmap.pdf"), dpi=150)
         plt.close()
 
@@ -200,7 +200,7 @@ def plot_grid_search_results(df, output_dir):
             ax2.grid(True, alpha=0.3)
             fig.colorbar(scatter2, ax=ax2, label="Embedding Dimension")
 
-        fig.tight_layout()
+        
         fig.savefig(os.path.join(output_dir, "grid_search_efficiency.pdf"), dpi=150)
         plt.close()
 
@@ -255,7 +255,7 @@ def main():
     if "HLF" in model_type:
         data_config_file = os.path.join(CONFIG_DIR, "workspace_config_HLF.yaml")
     else:
-        data_config_file = os.path.join(CONFIG_DIR, "workspace_config.yaml")
+        data_config_file = os.path.join(CONFIG_DIR, "nominal_load_config.yaml")
 
     data_config = core.get_load_config_from_yaml(data_config_file)
     data_loader = core.DataPreprocessor(data_config)
@@ -264,7 +264,7 @@ def main():
         config_dict = yaml.safe_load(f)
 
     data_config = data_loader.load_from_npz(
-        config_dict.data_path["nominal"], max_events=4_000_000, event_numbers="odd"
+        config_dict.data_path, max_events=4_000_000, event_numbers="odd"
     )
 
     validation_data,_ = data_loader.get_data()  # Get validation data

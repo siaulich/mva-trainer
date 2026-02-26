@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from typing import Optional
 from copy import deepcopy
 
-from .evaluator_base import (
+from .evaluator_utils import (
     BootstrapCalculator,
     AccuracyCalculator,
     SelectionAccuracyCalculator,
@@ -265,7 +265,7 @@ class MLEvaluator:
         # Remove any unused subplots
         for j in range(idx + 1, len(axes)):
             fig.delaxes(axes[j])
-        fig.tight_layout()
+        
         return fig, ax
 
     @staticmethod
@@ -365,11 +365,11 @@ class MLEvaluator:
                 #ax.set_title(f"Feature Importance - {model_name}")
                 ax.invert_yaxis()
                 ax.grid(True, alpha=0.3, axis="x")
-                fig.tight_layout()
+                
 
                 if save_dir:
                     save_path = f"{save_dir}/{model_name}_feature_importance.pdf"
-                    fig.savefig(save_path, dpi=300, bbox_inches="tight")
+                    fig.savefig(save_path, dpi=300)
                     print(f"Saved feature importance plot to {save_path}")
 
                 results.append((fig, ax))
@@ -413,11 +413,11 @@ class MLEvaluator:
                 ax2.invert_yaxis()
                 ax2.grid(True, alpha=0.3, axis="x")
 
-                fig.tight_layout()
+                
 
                 if save_dir:
                     save_path = f"{save_dir}/{model_name}_feature_importance.pdf"
-                    fig.savefig(save_path, dpi=300, bbox_inches="tight")
+                    fig.savefig(save_path, dpi=300)
                     print(f"Saved feature importance plot to {save_path}")
 
                 results.append((fig, (ax1, ax2)))
@@ -562,10 +562,10 @@ class MLEvaluator:
         ax2.grid(True, alpha=0.3, axis="y")
         ax2.tick_params(axis="x", rotation=45)
 
-        fig.tight_layout()
+        
 
         if save_path:
-            fig.savefig(save_path, dpi=300, bbox_inches="tight")
+            fig.savefig(save_path, dpi=300)
             print(f"\nInference time comparison plot saved to {save_path}")
 
         return fig, (ax1, ax2)
@@ -659,10 +659,10 @@ class MLEvaluator:
         ax.legend()
         ax.grid(True, alpha=0.3, axis="y")
 
-        fig.tight_layout()
+        
 
         if save_path:
-            fig.savefig(save_path, dpi=300, bbox_inches="tight")
+            fig.savefig(save_path, dpi=300)
             print(f"\nModel parameters comparison plot saved to {save_path}")
 
         return fig, ax

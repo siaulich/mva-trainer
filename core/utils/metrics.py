@@ -11,9 +11,41 @@ class AssignmentAccuracy(keras.metrics.Metric):
         self.count = self.add_weight(name="count", initializer="zeros")
 
     def update_state(self, y_true, y_pred, sample_weight=None):
-        y_true = tf.cast(tf.argmax(y_true, axis=-2), tf.int32) # shape: (batch_size, 2)
-        y_pred = tf.cast(tf.argmax(y_pred, axis=-2), tf.int32) # shape: (batch_size, 2)
-        matches = tf.reduce_all(tf.equal(y_true, y_pred), axis=-1) # shape: (batch_size,)
+        score_l0 = y_pred[..., 0]
+        score_l1 = y_pred[..., 1]
+
+        # (B, J, J) : broadcasting
+        product_matrix = (
+            tf.expand_dims(score_l0, axis=2) +
+            tf.expand_dims(score_l1, axis=1)
+        )
+
+        # -----------------------------------
+        # 2) Forbid same jet twice
+        # -----------------------------------
+        J = tf.shape(product_matrix)[1]
+        mask = 1.0 - tf.eye(J, batch_shape=[tf.shape(product_matrix)[0]])
+        product_matrix = product_matrix * mask
+
+        # -----------------------------------
+        # 3) Find best jet pair
+        # -----------------------------------
+        B = tf.shape(product_matrix)[0]
+        J = tf.shape(product_matrix)[1]
+
+        flat = tf.reshape(product_matrix, [B, -1])
+        idx = tf.argmax(flat, axis=1, output_type=tf.int32)
+
+        # Convert flat index -> (i, j)
+        jet_i = tf.cast(idx // J, tf.int32)
+        jet_j = tf.cast(idx % J, tf.int32)
+
+        # indices for lepton 0
+        pred_indices = tf.stack([jet_i, jet_j], axis=-1) # shape: (batch_size, 2)
+        true_indices = tf.cast(tf.argmax(y_true, axis=1),tf.int32) # shape: (batch_size, 2)
+
+
+        matches = tf.reduce_all(tf.equal(pred_indices, true_indices), axis=-1) # shape: (batch_size,)
         matches = tf.cast(matches, self.dtype) # shape: (batch_size,)
         count = tf.shape(y_true)[0]
         if sample_weight is not None:

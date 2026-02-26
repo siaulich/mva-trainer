@@ -15,7 +15,7 @@ log = logs/job_eval_$(Cluster).log
 
 arguments = python3 ../EvaluateScript.py \
     --output_dir ../evaluation/$(ModelName)/ \
-    --load_config evaluation/load_config.yaml \
+    --load_config ../config/test_load_config.yaml \
     --evaluation_config evaluation/evaluation_config.yaml \
     --model_config models/$(ModelName).yaml \
     --event_numbers $(EventNumbers)

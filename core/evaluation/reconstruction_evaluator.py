@@ -3,6 +3,9 @@
 import numpy as np
 from typing import Union, Optional, List, Tuple, Callable
 import matplotlib.pyplot as plt
+import matplotlib as mpl
+mpl.rcParams["figure.constrained_layout.use"] = True
+
 import os
 import timeit
 import keras as keras
@@ -14,7 +17,7 @@ from core.reconstruction import (
 )
 import seaborn as sns
 from core.base_classes import KerasMLWrapper
-from .evaluator_base import (
+from .evaluator_utils import (
     PlotConfig,
     BootstrapCalculator,
     BinningUtility,
@@ -1007,7 +1010,7 @@ class ReconstructionPlotter:
         # Plot all deviations together
         DistributionPlotter.plot_feature_distributions(
             all_deviations,
-            f"{variable_label}",
+            "Relative " if use_relative_deviation else "" + f"Deviation in {variable_label}",
             event_weights=event_weights_plot,
             labels=labels,
             ax=axes,
@@ -1582,7 +1585,7 @@ class ReconstructionPlotter:
             f"Binned Accuracy Quotients vs {feature_label} ({config.confidence*100:.0f}% CI)"
         )
         AccuracyPlotter._add_count_histogram(ax, bin_centers, bin_counts, bin_edges)
-        plt.tight_layout()
+        
 
         return fig, ax
 
@@ -1603,7 +1606,7 @@ class ReconstructionPlotter:
         for i, reconstructor in enumerate(self.prediction_manager.reconstructors):
             if reconstructor.use_nu_flows and not nu_flows:
                 nu_flows = True
-                names.append(r"\nu^2-Flows")
+                names.append(r"$\nu^2$-Flows")
             elif reconstructor.use_nu_flows and nu_flows:
                 continue
             elif (
@@ -1727,6 +1730,7 @@ class ReconstructionPlotter:
             figsize=(6 * len(component_labels), 5 * self.config.NUM_LEPTONS),
             ncols=len(component_labels),
             nrows=self.config.NUM_LEPTONS,
+            constrained_layout=True
         )
 
         for lepton_idx in range(self.config.NUM_LEPTONS):
@@ -1751,19 +1755,20 @@ class ReconstructionPlotter:
         # Remove individual legends from all axes
         for lepton_idx in range(self.config.NUM_LEPTONS):
             for comp_idx in range(len(component_labels)):
-                ax[lepton_idx, comp_idx].get_legend().remove()
+                leg = ax[lepton_idx, comp_idx].get_legend()
+                if leg is not None:
+                    leg.remove()
                 # pass
 
         # Add single legend for the whole figure
         fig.legend(
             handles,
             labels,
-            loc="upper center",
+            loc="center",
             bbox_to_anchor=(0.5, 1.04),
             ncol=len(names),
         )
 
-        plt.tight_layout()
         return fig, ax
 
     def plot_all_deviations(self, save_dir: Optional[str] = None):
@@ -1829,7 +1834,7 @@ class ReconstructionPlotter:
         self.save_accuracy_latex_table(save_dir=os.path.join(save_dir), **kwargs)
         fig, ax = self.plot_all_accuracies(**kwargs)
         if save_dir is not None:
-            file_name = f"assignment_selection_accuracies.pdf"
+            file_name = f"assignment_accuracies.pdf"
             file_path = os.path.join(save_dir, file_name)
             fig.savefig(file_path)
         plt.close(fig)
@@ -1847,6 +1852,7 @@ class ReconstructionPlotter:
         feature_name: str = "pt",
         fancy_feature_label: Optional[str] = None,
         rescale_factor: Optional[float] = None,
+        accuracy_only = False,
         **kwargs,
     ):
         """
@@ -1899,6 +1905,8 @@ class ReconstructionPlotter:
             file_path = os.path.join(save_dir, file_name)
             fig.savefig(file_path)
         plt.close(fig)
+        if accuracy_only:
+            return
 
         for variable_key in self.variable_configs.keys():
 
@@ -1935,3 +1943,27 @@ class ReconstructionPlotter:
                 fig.savefig(file_path)
             plt.close(fig)
         self.save_regression_error_latex_table(save_dir=os.path.join(save_dir), **kwargs)
+
+    def plot_all_distributions(self, save_dir: Optional[str] = None, **kwargs):
+        """
+        Plot all distributions for all variables and reconstructors.
+
+        Args:
+            save_dir: Optional directory to save the plots
+            **kwargs: Additional arguments for plotting
+        """
+        for variable_key in self.variable_configs.keys():
+            config = self.variable_configs[variable_key]
+            variable_label = config["label"]
+
+            fig, axes = self.plot_distributions_all_reconstructors(
+                variable_name=variable_key,
+                variable_label=variable_label,
+                **kwargs,
+            )
+
+            if save_dir is not None:
+                file_name = f"{variable_key}_distributions.pdf"
+                file_path = os.path.join(save_dir, file_name)
+                fig.savefig(file_path)
+            plt.close(fig)

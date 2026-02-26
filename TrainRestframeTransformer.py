@@ -107,7 +107,7 @@ if __name__ == "__main__":
 
     data_preprocessor = DataPreprocessor(load_config)
     data_config = data_preprocessor.load_from_npz(
-        load_config.data_path["nominal"],
+        load_config.data_path,
         event_numbers=args.event_numbers,
         max_events=args.max_events,
     )

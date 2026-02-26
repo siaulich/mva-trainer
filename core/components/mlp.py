@@ -102,7 +102,7 @@ class MLP(keras.layers.Layer):
                 ln_layer = keras.layers.LayerNormalization(name=f"ln_{i}")
                 self.layers_list.append(ln_layer)
 
-            if self.dropout_rate > 0 and i < len(hidden_dims_list) - 1:
+            if self.dropout_rate > 0:
                 dropout_layer = keras.layers.Dropout(
                     self.dropout_rate, name=f"dropout_{i}"
                 )

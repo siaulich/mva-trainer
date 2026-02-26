@@ -1,5 +1,5 @@
 # ttbar-mva-trainer
-A standalone analysis framework for training and evaluating machine learning models for reconstruction of dileptonic ttbar events. The framework includes **pure Python data preprocessing**, data loading and model training using TensorFlow, and integration with the Condor job scheduler for distributed training and evaluation.
+A standalone analysis framework for training and evaluating machine learning models for reconstruction of dileptonic ttbar events. The framework includes data-preprocessing, data loading and model training using TensorFlow, and integration with the Condor job scheduler for distributed training and evaluation.
 
 The models are designed to perform both reconstruction of the neutrino momenta as well as assignment of jets to the corresponding b-quarks from the top quark decays.
 
@@ -182,51 +182,30 @@ The DataPreprocessor provides additional functionality:
 - **Backward compatible**: Works with existing structured NPZ files
 - **Type safety**: Validates feature names and array shapes
 
-## Reconstruction Models
-The base class for all reconstruction models is the `BaseReconstructor` class, which is defined in the `core/reconstruction/Reconstruction.py` file. This class provides the basic functionality for all reconstruction models regardless of the underlying model type.
 
 ### Machine Learning Models
-Machine learning-based reconstruction models are to be implemented by inheriting from the `KerasFFRecoBase` class, which is defined in the `core/reconstruction/Reconstruction.py` file. This class provides additional functionality for machine learning-based reconstruction models, such as training and evaluation methods and handling the input and output data formats.
+Machine learning-based reconstruction models are to be implemented by inheriting from the `KerasMLWrapper` class, which is defined in the `core/base_classes/keras_ml_wrapper.py` file. This class provides the basic funcationality for machine learning-based reconstruction models.
 
-To implement a new machine learning-based reconstruction model, you need to create a new class that inherits from the `KerasFFRecoBase` class and implement the following method:
-- `build_model(self, **kwargs)`: This method is used to define the architecture of the machine learning model. You can use TensorFlow/Keras to define the model architecture.
+Depending on the type of architecture used for the machine learning-based reconstruction model, the `KerasMLWrapper` class can be further extended by inheriting from the `KerasFFRecoBase` class, which is defined in the `core/reconstruction/keras_ff_reco_base.py` file. This class provides additional functionality specific to feed-forward neural network architectures for reconstruction models. To build a feed-forward neural network-based reconstruction model, the new model class should inherit from the `KerasFFRecoBase` classes.
+
+
 
 ### Baseline Models
 Baseline reconstruction models are to be implemented by inheriting from the `BaselineReconstructor` class, which is defined in the `core/assignment_models/BaseLineAssingmentMethods.py` file. This class provides the functionality for baseline reconstruction models, such as simple heuristic-based assignment methods.
 
 
-## Model Training
-The training of the models is handled by the `KerasFFRecoBase` class which provides methods for training and evaluating machine learning-based reconstruction models. The training process involves loading the data using the `DataPreprocessor` class, preprocessing the data, and then training the model using the specified architecture and hyperparameters.
-
-
 ## Evaluation
-To evaluate the performance of the reconstruction models, the `ReconstructionPlotter` class is used, which is defined in the `core/reconstruction/Evaluation.py` file. This class provides methods for evaluating the performance of various reconstruction models using different metrics and visualizations. The evaluation process involves loading the test data, making predictions using the trained models, and then calculating various performance metrics such as accuracy, precision, recall, and F1-score. The class also provides methods for visualizing the results using plots and histograms.
+To evaluate the performance of the reconstruction models, the `ReconstructionPlotter` class is used, which is defined in the `core/reconstruction/reconstruction_evaluator.py` file. This class provides methods for evaluating the performance of various reconstruction models using different metrics and visualizations. The evaluation process involves loading the test data, making predictions using the trained models, and then calculating various performance metrics such as accuracy, precision, recall, and F1-score. The class also provides methods for visualizing the results using plots and histograms.
 
 To evaluate metrics for machine learning-based reconstructors, the `MLEvaluator` method is used. This method provides functionality for evaluating machine learning-based reconstruction models using various metrics and visualizations.
 
 
-## Export Models for use in TopCPToolKit
-The trained machine learning models can be exported for use in the TopCPToolKit. The `export_to_onnx` method in the `KerasMLWrapper` class is used to export the trained model to a format that can be used in the TopCPToolKit. The exported model can then be integrated into the TopCPToolKit for use in physics analyses. For further use, please refer to the TopCPToolKit documentation and the DiLepTagger module.
-Note: So far, only models providing assignments as output can be exported to ONNX format for use in the TopCPToolKit.
-
 ## Condor Integration
 ### Hyperparameter Grid Search
-The framework includes integration with the Condor job scheduler for distributed training and evaluation. The Condor scripts are located in the `CONDOR` directory. The `HypParamGridSearch` subdirectory contains scripts for performing hyperparameter grid search using Condor. The `run_training.sh` script is used to run the training of the models using Condor. The `train_hyperparameter.py` script is used to train the models with specified hyperparameters.
+The framework includes integration with the Condor job scheduler for distributed training and evaluation. The Condor scripts are located in the `CONDOR` directory.
 
 
 
 
 ## Dependencies
 The code is written in Python 3.9 and the dependencies are managed using `pip`. The required dependencies are listed in the `requirements.txt` file. To install the dependencies, you can run the following command:
-
-```bash
-pip install -r requirements.txt
-```
-
-or if you want to install the dependencies in a virtual environment, you can run the following commands:
-
-```bash
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-```

@@ -102,79 +102,13 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
             X_train = {key: deepcopy(X[key]) for key in self.inputs.keys()}
         else:
             X_train = {key: X[key] for key in self.inputs.keys()}
-        y_train = {}
 
-        # Rename targets to match model output names
-        if y is None:
-            y_train["assignment"] = X["assignment"]
-            y_train["regression"] = X["regression"] if "regression" in y else None
-        else:
-            y_train = y.copy()  if not copy_data else deepcopy(y)
-
-
-        if not self.perform_regression:
-            y_train.pop("regression")
-
-        if "regression" in y_train:
-            regression_data = y_train.pop("regression")
-            upscale_layer = self.model.get_layer("regression")
-            if upscale_layer is None:
-                raise ValueError(
-                    "Regression layer not found in model. Cannot prepare regression targets."
-                )
-            if not isinstance(upscale_layer, keras.layers.Rescaling):
-                raise ValueError(
-                    "Regression layer is not a Rescaling layer. Cannot prepare regression targets."
-                )
-            regression_std = upscale_layer.scale
-            if isinstance(regression_data, dict):
-                y_train["normalized_regression"] = {}
-                for key in regression_data:
-                    if regression_data[key] is not None:
-                        y_train["normalized_regression"][key] = regression_data[key] / regression_std
-                    else:
-                        y_train["normalized_regression"][key] = None
-            else:
-                y_train["normalized_regression"] = regression_data / regression_std
-
-        if "reco_mass_deviation" in self.trainable_model.output:
-            y_train["reco_mass_deviation"] = np.zeros(
-                (y_train["assignment"].shape[0], 1), dtype=np.float32
-            )
-        if "confidence_loss_output" in self.trainable_model.output:
-            y_train["confidence_loss_output"] = y_train["assignment"]
+        y_train = self.prepare_labels(X, y)
+        
         return X_train, y_train, sample_weights
 
-    def add_reco_mass_deviation_loss(self):
-        if self.model is None:
-            raise ValueError(
-                "Model has not been built yet. Call build_model() before adding physics-informed loss. If you use regression, adapt the normalization layers first."
-            )
-        if "regression" not in self.model.output_names:
-            raise ValueError(
-                "Regression output not found in model outputs. Cannot add physics-informed loss."
-            )
-        reco_mass_deviation_layer = PhysicsInformedLoss(name="reco_mass_deviation")
-        neutrino_momenta = self.model.get_layer("regression").output
-
-        if neutrino_momenta is None:
-            raise ValueError(
-                "Regression output not found in model outputs. Cannot add physics-informed loss."
-            )
-
-        lepton_momenta = self.inputs["lep_inputs"]
-
-        reco_mass_deviation = reco_mass_deviation_layer(
-            neutrino_momenta, lepton_momenta
-        )
-        trainable_outputs = {**self.trainable_model.output}
-        trainable_outputs["reco_mass_deviation"] = reco_mass_deviation
-        self.trainable_model = keras.Model(
-            inputs=self.model.inputs,
-            outputs=trainable_outputs,
-        )
-
-        print("Added physics-informed loss to the model.")
+    def prepare_labels(self, X,y):
+        return y
 
     def _prepare_inputs(
         self, log_variables=True, compute_HLF=False, use_global_event_inputs=False
@@ -198,12 +132,14 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
         transformed_jet_inputs = ProcessPtEtaPhiELayer(
             name="jet_input_transform",
             padding_value=self.padding_value,
+            log_variables=log_variables,
         )(jet_inputs)
         transformed_lep_inputs = ProcessPtEtaPhiELayer(
             name="lep_input_transform",
             padding_value=self.padding_value,
+            log_variables=log_variables,
         )(lep_inputs)
-        transformed_met_inputs = InputMetLayer(name="met_input_transform")(met_inputs)
+        transformed_met_inputs = InputMetLayer(name="met_input_transform", log_variables=log_variables)(met_inputs)
 
         if compute_HLF:
             high_level_features = ComputeHighLevelFeatures_from_PtEtaPhiE(
@@ -270,7 +206,6 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
         sample_weight=None,
         validation_split=0.2,
         callbacks=[],
-        copy_data=False,
         **kwargs,
     ):
         if self.model is None:
@@ -448,28 +383,10 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
                 del submodel
                 print("Adapted normalization layer: ", layer.name)
 
-        if (
-            self.perform_regression
-            and "normalized_regression" in self.model.output_names
-        ):
-            # neutrino_truth_std = np.std(data["regression"], axis=0)
-            # neutrino_truth_mean = np.mean(data["regression"], axis=0)
-            denormalisation_layer = keras.layers.Rescaling(
-                scale=1e5,  # Scale neutrinos to 100 GeV by default
-                # offset=neutrino_truth_mean,
-                # scale = neutrino_truth_std,
-                name="regression",
-            )
-            outputs = self.model.output
-            outputs["regression"] = denormalisation_layer(
-                self.model.get_layer("normalized_regression").output
-            )
-            outputs.pop("normalized_regression")
-            self.model = keras.models.Model(
-                inputs=self.model.inputs,
-                outputs=outputs,
-            )
-            print("Set regression denormalization layer with computed mean and std.")
+        self.adapt_output_layer_scales(data)
+    
+    def adapt_output_layer_scales(self, data: dict):
+        pass
 
     def export_to_onnx(self, onnx_file_path="model.onnx"):
         """
