@@ -44,143 +44,9 @@ The preprocessing pipeline performs:
 5. Optional NuFlow neutrino reconstruction results
 6. Optional initial parton information
 
-### Python API
-
-```python
-from core.RootPreprocessor import preprocess_root_file
-
-# Simple preprocessing
-data = preprocess_root_file(
-    input_path="input.root",
-    output_path="output.npz",
-    output_format="npz"
-)
-
-# Direct integration with DataPreprocessor
-from core import DataPreprocessor, LoadConfig
-
-preprocessor = DataPreprocessor(load_config)
-preprocessor.load_from_npz("preprocessed_data.npz")
-```
-
-For detailed preprocessing documentation, see [`scripts/README_PREPROCESSING.md`](scripts/README_PREPROCESSING.md).
-
 
 ## Data Loading
 The `DataPreprocessor` class (in `core/DataLoader.py`) handles loading preprocessed data for training and evaluation. It requires a `LoadConfig` that specifies which features to load from NPZ files and how to interpret them. The DataLoader automatically detects whether data is in flat format (from RootPreprocessor) or structured format and handles the conversion transparently.
-
-### Quick Start
-
-```python
-from core.DataLoader import DataPreprocessor
-from core.Configs import LoadConfig
-
-# Create LoadConfig specifying which features to load
-load_config = LoadConfig(
-    jet_features=['pt', 'eta', 'phi', 'e', 'b'],
-    lepton_features=['pt', 'eta', 'phi', 'e'],
-    met_features=[],
-    non_training_features=['truth_ttbar_mass', 'truth_top_mass'],
-    jet_truth_label='event_jet_truth_idx',
-    lepton_truth_label='event_lepton_truth_idx',
-    max_jets=10,
-    NUM_LEPTONS=2,
-    event_weight='event_weight',
-    mc_event_number='mc_event_number',
-    neutrino_momentum_features=['px', 'py', 'pz'],
-    antineutrino_momentum_features=['px', 'py', 'pz'],
-)
-
-# Load data using the config
-data_loader = DataPreprocessor(load_config)
-data_loader.load_from_npz("preprocessed_data.npz")
-
-# Access data configuration
-data_config = data_loader.get_data_config()
-print(f"Loaded {data_loader.data_length} events")
-
-# Access features
-jet_features = data_loader.feature_data['jet']  # (n_events, max_jets, n_jet_features)
-lepton_features = data_loader.feature_data['lepton']  # (n_events, 2, n_lepton_features)
-labels = data_loader.feature_data['assignment']  # (n_events, max_jets, 2)
-
-# Split data for training
-X_train, y_train, X_test, y_test = data_loader.split_data(test_size=0.2)
-```
-
-### Format Auto-Detection
-
-The DataLoader automatically handles two input formats:
-
-1. **Flat format** (from RootPreprocessor): Keys like `lep_pt`, `jet_eta`
-   - Automatically groups by particle type based on LoadConfig feature names
-   - Builds truth labels from configured truth label keys
-   - Constructs regression targets from configured momentum features
-
-2. **Structured format** (legacy): Keys like `lepton`, `jet` with pre-stacked arrays
-   - Maintains backward compatibility with existing NPZ files
-   - Direct loading without conversion
-
-The LoadConfig tells the DataLoader:
-- **Which features to load**: `jet_features`, `lepton_features`, `met_features`
-- **Where to find truth labels**: `jet_truth_label`, `lepton_truth_label`
-- **Which regression targets to include**: `neutrino_momentum_features`
-- **Optional features**: `non_training_features`, `event_weight`, `mc_event_number`
-
-### Complete Integration Example
-
-```python
-# Step 1: Preprocess ROOT files
-from core.RootPreprocessor import RootPreprocessor
-
-preprocessor = RootPreprocessor()
-preprocessor.process_root_file("data.root", "reco")
-preprocessor.save_to_npz("data.npz")
-
-# Step 2: Create LoadConfig for your analysis
-from core.Configs import LoadConfig
-
-load_config = LoadConfig(
-    jet_features=['pt', 'eta', 'phi', 'e', 'b'],
-    lepton_features=['pt', 'eta', 'phi', 'e'],
-    jet_truth_label='event_jet_truth_idx',
-    lepton_truth_label='event_lepton_truth_idx',
-    max_jets=10,
-    NUM_LEPTONS=2,
-    event_weight='event_weight',
-    neutrino_momentum_features=['px', 'py', 'pz'],
-    antineutrino_momentum_features=['px', 'py', 'pz'],
-)
-
-# Step 3: Load for ML training
-from core.DataLoader import DataPreprocessor
-
-data_loader = DataPreprocessor(load_config)
-data_loader.load_from_npz("data.npz")
-X_train, y_train, X_test, y_test = data_loader.split_data()
-
-# Step 4: Train your model
-# model.fit(X_train, y_train, validation_data=(X_test, y_test))
-```
-
-See [`notebooks/IntegrationExample.ipynb`](notebooks/IntegrationExample.ipynb) for a complete tutorial.
-
-### Advanced Usage
-
-The DataPreprocessor provides additional functionality:
-- **Data splitting**: Train/test splits, k-fold cross-validation, even/odd event splitting
-- **Feature access**: Get specific features by name or all features by type
-- **Custom features**: Add derived features computed from existing data
-- **Event weights**: Access and normalize event weights
-- **Normalization**: Apply standardization to features
-
-### Key Features
-
-- **Flexible configuration**: LoadConfig specifies exactly what to load
-- **Format detection**: Automatically handles flat and structured formats
-- **Missing feature handling**: Warnings for missing optional features, errors for required ones
-- **Backward compatible**: Works with existing structured NPZ files
-- **Type safety**: Validates feature names and array shapes
 
 
 ### Machine Learning Models
@@ -203,8 +69,6 @@ To evaluate metrics for machine learning-based reconstructors, the `MLEvaluator`
 ## Condor Integration
 ### Hyperparameter Grid Search
 The framework includes integration with the Condor job scheduler for distributed training and evaluation. The Condor scripts are located in the `CONDOR` directory.
-
-
 
 
 ## Dependencies

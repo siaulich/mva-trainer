@@ -10,13 +10,11 @@ import os
 import timeit
 import keras as keras
 from core.reconstruction import (
-    EventReconstructorBase,
     GroundTruthReconstructor,
     KerasFFRecoBase,
-    CompositeNeutrinoComponentReconstructor,
 )
 import seaborn as sns
-from core.base_classes import KerasMLWrapper
+from ..base_classes import KerasMLWrapper, EventReconstructorBase
 from .evaluator_utils import (
     PlotConfig,
     BootstrapCalculator,
@@ -42,7 +40,7 @@ from .physics_calculations import (
 )
 from .reco_variable_config import reconstruction_variable_configs
 
-from core.utils import (
+from ..utils import (
     compute_pt_from_lorentz_vector_array,
     project_vectors_onto_axis,
     lorentz_vector_from_PtEtaPhiE_array,

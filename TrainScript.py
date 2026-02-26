@@ -130,7 +130,7 @@ if __name__ == "__main__":
 
     losses = {
             key: getattr(utils, value["class_name"])(**value.get("config", {}))
-            for key, value in model_config.compile_options["loss"].items()
+            for key, value in compile_options["loss"].items()
         }
     compile_options.pop("loss", None)
     metrics = {
@@ -138,13 +138,13 @@ if __name__ == "__main__":
                 getattr(utils, metric["class_name"])(**metric.get("config", {}))
                 for metric in value
             ]
-            for key, value in model_config.compile_options["metrics"].items()
-        },
+            for key, value in compile_options["metrics"].items()
+        }
     compile_options.pop("metrics", None)
-
-
+    optimizer=keras.optimizers.get(compile_options["optimizer"])
+    compile_options.pop("optimizer", None)
     model.compile_model(
-        optimizer=keras.optimizers.get(model_config.compile_options["optimizer"]),
+        optimizer=optimizer,
         loss=losses,
         metrics=metrics,
         **compile_options,
