@@ -14,7 +14,7 @@ import matplotlib as mpl
 mpl.rcParams["figure.constrained_layout.use"] = True
 from core import DataConfig, LoadConfig, load_yaml_config, get_load_config_from_yaml
 from core.DataLoader import DataPreprocessor
-from core import evaluation, reconstruction
+from core import evaluation, reconstruction, base_classes
 
 
 @dataclass
@@ -87,6 +87,11 @@ def parse_args():
         action="store_true",
         help="Whether to only evaluate and plot accuracy-related metrics (default: False)",
     )
+    parser.add_argument(
+        "--ml_metrics",
+        action="store_true",
+        help="Whether to evaluate and plot ML-specific metrics for ML-based reconstructors (default: False)",
+    )
     return parser.parse_args()
 
 
@@ -110,6 +115,7 @@ if __name__ == "__main__":
     print("Successfully loaded data for evaluation:")
     # Initialize reconstructors based on the evaluation configuration
     reconstructors = []
+    ml_reconstructors = []
     for reconstructor_cfg in evaluation_config.reconstructors:
         reconstructor_cfg.options["config"] = data_config
         reconstructor = reconstruction.get_reconstructor(reconstructor_cfg.type)(
@@ -117,13 +123,26 @@ if __name__ == "__main__":
         )
         reconstructors.append(reconstructor)
         print(f"Initialized reconstructor: {reconstructor_cfg.type}")
+        if isinstance(reconstructor, base_classes.KerasMLWrapper):
+            ml_reconstructors.append(reconstructor)
+
+    output_dir = args.output_dir or "./evaluation_results"
+    if ml_reconstructors and args.ml_metrics:
+        ml_evaluator = evaluation.MLEvaluator(ml_reconstructors, X, y)
+        ml_metrics_output_dir = os.path.join(args.output_dir or "./evaluation_results", "ml_metrics")
+        os.makedirs(ml_metrics_output_dir, exist_ok=True)
+        fig, ax = ml_evaluator.plot_training_history()
+        print(f"Saved training history plot to {ml_metrics_output_dir}")
+        fig.savefig(os.path.join(ml_metrics_output_dir, "training_history.png"))
+        ml_evaluator.plot_feature_importance(save_dir=ml_metrics_output_dir)
+        print(f"Saved feature importance plots to {ml_metrics_output_dir}")
+        del ml_evaluator
+    del ml_reconstructors
 
     prediction_manager = evaluation.PredictionManager(reconstructors, X, y)
-
     print("Initialized PredictionManager")
 
     evaluator = evaluation.ReconstructionPlotter(prediction_manager)
-    output_dir = args.output_dir or "./evaluation_results"
     os.makedirs(output_dir, exist_ok=True)
 
     deviation_directory = os.path.join(output_dir, "deviations")

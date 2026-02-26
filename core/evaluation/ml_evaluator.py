@@ -231,7 +231,7 @@ class MLEvaluator:
         num_metrics = len(unique_metrics)
         num_cols = int(np.ceil(np.sqrt(num_metrics)))
         num_rows = int(np.ceil(num_metrics / num_cols))
-        fig, axes = plt.subplots(num_rows, num_cols, figsize=(6 * num_cols, 4 * num_rows))
+        fig, axes = plt.subplots(num_rows, num_cols, figsize=(8 * num_cols, 6 * num_rows))
         axes = axes.flatten()
         for idx, metric_name in enumerate(unique_metrics):
             ax = axes[idx]
@@ -257,7 +257,7 @@ class MLEvaluator:
                         color=color,
                         linestyle='--'
                     )
-            ax.set_title(f"{metric_name.replace('_', ' ').title()} Over Epochs")
+            ax.set_title(f"{metric_name.replace('_', ' ').title()}")
             ax.set_xlabel("Epoch")
             ax.set_ylabel(metric_name.replace('_', ' ').title())
             ax.legend()
