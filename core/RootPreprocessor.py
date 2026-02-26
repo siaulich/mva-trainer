@@ -46,6 +46,8 @@ class PreprocessorConfig:
 
     padding_value: float = -999.0  # Padding value for missing data
 
+    data_cuts: Dict[str, Tuple[float, float]] = None  # Optional cuts on features (min, max)
+
 
 @dataclass
 class DataSampleConfig:
@@ -119,6 +121,19 @@ class RootPreprocessor:
             n_invalid = self.n_events_passed - np.sum(valid_mask)
             print(f"Events with invalid data (NaN/Inf): {n_invalid}")
     
+        if self.config.data_cuts is not None:
+            for feature, (min_val, max_val) in self.config.data_cuts.items():
+                if feature in self.processed_data:
+                    feature_array = self.processed_data[feature]
+                    if min_val is not None:
+                        valid_mask &= np.all(feature_array >= min_val, axis=tuple(range(1, feature_array.ndim)))
+                    if max_val is not None:
+                        valid_mask &= np.all(feature_array <= max_val, axis=tuple(range(1, feature_array.ndim)))
+                else:
+                    if self.config.verbose:
+                        print(f"Warning: Feature '{feature}' specified in data_cuts not found in processed data.")
+
+
         for key in self.processed_data.keys():
             self.processed_data[key] = self.processed_data[key][valid_mask]
 
@@ -421,24 +436,10 @@ class RootPreprocessor:
         }
 
     def _process_jets(self, events: ak.Array) -> Dict[str, np.ndarray]:
-        """
-        Process and order jets.
-
-        Jets are sorted by pT (highest first).
-
-        Args:
-            events: Event array
-
-        Returns:
-            Dictionary of jet features
-        """
-        # Process jets using vectorized operations
         n_events = len(events)
 
-        # Pad jet truth indices and broadcast properly
         jet_truth_padded = ak.fill_none(ak.pad_none(events.event_jet_truth_idx, 6), -1)
 
-        # Create truth matching for b-jets - use broadcasting that works with jagged arrays
         jet_idx = ak.local_index(events.jet_pt_NOSYS)
         jet_truth_0 = ak.broadcast_arrays(jet_truth_padded[:, 0], events.jet_pt_NOSYS)[
             0
@@ -449,7 +450,7 @@ class RootPreprocessor:
         jet_truth_idx = ak.where(
             jet_idx == jet_truth_0, 1, ak.where(jet_idx == jet_truth_3, -1, 0)
         )
-        # Sort jets by pT (descending)
+
         sort_idx = ak.argsort(events.jet_pt_NOSYS, ascending=False)
         jet_pt = events.jet_pt_NOSYS[sort_idx]
         jet_eta = events.jet_eta[sort_idx]
@@ -458,11 +459,9 @@ class RootPreprocessor:
         jet_btag = events.jet_GN2v01_Continuous_quantile[sort_idx]
         jet_truth = jet_truth_idx[sort_idx]
 
-        # Find maximum number of jets
         n_jets = ak.num(jet_pt)
         max_jets = self.config.max_saved_jets
 
-        # Pad and convert to numpy
         jet_pt_np = ak.to_numpy(
             ak.fill_none(
                 ak.pad_none(jet_pt, max_jets, clip=True), self.config.padding_value
@@ -494,7 +493,6 @@ class RootPreprocessor:
             )
         )
 
-        # Build jet truth index array
         event_jet_truth_idx = np.full((n_events, 6), -1, dtype=np.int32)
         for idx in range(max_jets):
             mask_top = jet_truth_np[:, idx] == 1
@@ -502,7 +500,6 @@ class RootPreprocessor:
             event_jet_truth_idx[mask_top, 0] = idx
             event_jet_truth_idx[mask_tbar, 3] = idx
 
-        # Number of jets per event
         n_jets = ak.to_numpy(n_jets).astype(np.int32)
 
         n_bjets = np.sum(jet_btag_np >= 2, axis = -1)
@@ -519,15 +516,6 @@ class RootPreprocessor:
         }
 
     def _process_met(self, events: ak.Array) -> Dict[str, np.ndarray]:
-        """
-        Process missing transverse energy (MET).
-
-        Args:
-            events: Event array
-
-        Returns:
-            Dictionary of MET features
-        """
         met_met = ak.to_numpy(events.met_met_NOSYS)
         met_phi = ak.to_numpy(events.met_phi_NOSYS)
 
@@ -537,15 +525,6 @@ class RootPreprocessor:
         }
 
     def _proccess_event_weight(self, events: ak.Array) -> np.ndarray:
-        """
-        Process event weights.
-
-        Args:
-            events: Event array
-
-        Returns:
-            Numpy array of event weights
-        """
         event_weight = ak.to_numpy(events.weight_mc_NOSYS)
         return event_weight
 
