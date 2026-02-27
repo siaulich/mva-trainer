@@ -122,58 +122,41 @@ class FocalAssignmentLoss(keras.losses.Loss):
 
 
 @keras.utils.register_keras_serializable()
-class RegressionLoss(keras.losses.Loss):
+class RegressionMSE(keras.losses.Loss):
     def __init__(
         self,
-        alpha=1.0,  # floor for denominator (in same units as momenta)
-        var_weights=None,  # shape (num_vars,) or None
-        epsilon=1e-8,  # numerical safety
         name="regression_loss",
         **kwargs,
     ):
         super().__init__(name=name, **kwargs)
-        self.alpha = float(alpha)
-        self.epsilon = float(epsilon)
-        self.var_weights = (
-            tf.constant(var_weights, dtype=tf.float32)
-            if var_weights is not None
-            else None
-        )
 
     def call(self, y_true, y_pred, sample_weight=None):
         """
         y_true, y_pred: shape (batch, n_items, n_vars)
         """
-        y_true = tf.cast(y_true, tf.float32)
-        y_pred = tf.cast(y_pred, tf.float32)
-
-        rel = y_true - y_pred
-        sq = tf.square(rel)  # (batch, n_items, n_vars)
-
-        # apply per-variable weights if given
-        if self.var_weights is not None:
-            # Ensure shape broadcastable: (n_vars,) or (n_vars_of_sq)
-            sq = sq * tf.maximum(self.var_weights, self.epsilon)
+        sq = tf.square(y_true - y_pred)  # (batch, n_items, n_vars)
+        if sample_weight is not None:
+            sample_weight = tf.reshape(tf.cast(sample_weight, sq.dtype), [-1, 1, 1])
+            sq = sq * sample_weight
 
         # reduce: mean over vars and items, produce per-sample loss
         per_sample = tf.reduce_mean(sq, axis=[1, 2])  # (batch,)
 
         return per_sample
 
-    def get_config(self):
-        config = super().get_config()
-        config.update(
-            {
-                "alpha": self.alpha,
-                "epsilon": self.epsilon,
-                "var_weights": (
-                    None
-                    if self.var_weights is None
-                    else self.var_weights.numpy().tolist()
-                ),
-            }
-        )
-        return config
+
+class RegressionMAE(keras.losses.Loss):
+    def __init__(self, name="regression_mae", **kwargs):
+        super().__init__(name=name, **kwargs)
+
+    def call(self, y_true, y_pred, sample_weight=None):
+        mae = tf.abs(y_true - y_pred)
+        if sample_weight is not None:
+            sample_weight = tf.reshape(tf.cast(sample_weight, mae.dtype), [-1, 1, 1])
+            mae = mae * sample_weight
+        mae = tf.reduce_mean(mae, axis=[1, 2])  # (batch,)
+        return mae
+
 
 
 @keras.utils.register_keras_serializable()

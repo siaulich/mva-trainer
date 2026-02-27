@@ -60,7 +60,6 @@ class FeatureImportanceCalculator:
             self.y_test["assignment"],
             per_event=False,
         )
-        regression_baseline_prediction = None
         print(f"Baseline Assignment Performance: {assignment_baseline_performance:.4f}")
 
         regression_baseline_performance = None
@@ -68,7 +67,7 @@ class FeatureImportanceCalculator:
             regression_baseline_performance = (
                 NeutrinoDeviationCalculator.compute_relative_deviation(
                     regression_baseline_prediction,
-                    self.y_test["nu_flows_neutrino_truth"],
+                    self.y_test["regression"],
                 )
             )
             print(
