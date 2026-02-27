@@ -1,6 +1,7 @@
 from .assignment_RNN import *
 from .assignment_transformer import *
 from .regression_transformer import *
+from .binned_regression_transformer import *
 from ..reconstruction.baseline_methods import *
 
 def _get_model(model_name) -> type[KerasFFRecoBase]:

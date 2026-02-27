@@ -13,6 +13,7 @@ methods with support for:
 from .baseline_methods import DeltaRAssigner, ChiSquareAssigner
 from .ground_truth_reconstructor import GroundTruthReconstructor, PerfectAssignmentReconstructor
 from .keras_ff_reco_base import KerasFFRecoBase
+from .keras_binned_regressor import KerasBinnedRegressor
 
 
 __all__ = [

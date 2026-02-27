@@ -158,6 +158,25 @@ class RegressionMAE(keras.losses.Loss):
         return mae
 
 
+class BinnedRegressionLoss(keras.losses.Loss):
+    def __init__(self, name="binned_regression_loss", **kwargs):
+        super().__init__(name=name, **kwargs)
+
+    def call(self, y_true, y_pred, sample_weight=None):
+        # y_true: (batch, n_items, n_vars, n_bins)
+        # y_pred: (batch, n_items, n_vars, n_bins) - probabilities
+
+        ce = -tf.reduce_sum(
+            y_true * tf.math.log(y_pred + 1e-7), axis=-1
+        )  # (batch, items, vars)
+
+        ce = tf.reduce_mean(ce, axis=[1, 2])  # mean over items and vars -> (batch,)
+
+        if sample_weight is not None:
+            ce = ce * sample_weight
+
+        return ce
+
 
 @keras.utils.register_keras_serializable()
 class PtEtaPhiLoss(keras.losses.Loss):

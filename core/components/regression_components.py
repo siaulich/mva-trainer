@@ -4,7 +4,9 @@ import tensorflow as tf
 
 @keras.utils.register_keras_serializable()
 class SplitTransformerOutput(keras.layers.Layer):
-    def __init__(self, name="SplitTransformerOutput", max_jets=6, max_leptons=2, **kwargs):
+    def __init__(
+        self, name="SplitTransformerOutput", max_jets=6, max_leptons=2, **kwargs
+    ):
         super().__init__(name=name, **kwargs)
         self.max_jets = max_jets
         self.max_leptons = max_leptons
@@ -21,20 +23,21 @@ class SplitTransformerOutput(keras.layers.Layer):
                 - met_outputs (tf.Tensor): The MET component of shape (batch_size, 1, hidden_dim).
         """
         jet_outputs = inputs[:, : self.max_jets, :]
-        lepton_outputs = inputs[
-            :, self.max_jets : self.max_jets + self.max_leptons, :
-        ]
+        lepton_outputs = inputs[:, self.max_jets : self.max_jets + self.max_leptons, :]
         met_outputs = inputs[:, -1:, :]
         return jet_outputs, lepton_outputs, met_outputs
-    
+
     def get_config(self):
         config = super().get_config()
-        config.update({
-            "max_jets": self.max_jets,
-            "max_leptons": self.max_leptons,
-        })
+        config.update(
+            {
+                "max_jets": self.max_jets,
+                "max_leptons": self.max_leptons,
+            }
+        )
         return config
-    
+
+
 @keras.utils.register_keras_serializable()
 class ConcatLeptonCharge(keras.layers.Layer):
     def __init__(self, name="ConcatLeptonCharge", **kwargs):
@@ -73,7 +76,9 @@ class ExpandJetMask(keras.layers.Layer):
             tf.Tensor: The expanded jet mask tensor of shape (batch_size, max_jets + extra_sequence_length).
         """
         batch_size = tf.shape(jet_mask)[0]
-        extra_mask = tf.ones((batch_size, self.extra_sequence_length), dtype=jet_mask.dtype)
+        extra_mask = tf.ones(
+            (batch_size, self.extra_sequence_length), dtype=jet_mask.dtype
+        )
         expanded_mask = tf.concat([jet_mask, extra_mask], axis=1)
         return expanded_mask
 
@@ -81,3 +86,57 @@ class ExpandJetMask(keras.layers.Layer):
         config = super().get_config()
         config.update({"extra_sequence_length": self.extra_sequence_length})
         return config
+
+
+@keras.utils.register_keras_serializable()
+class UnbinRegressionOutput(keras.layers.Layer):
+    def __init__(self, scale, n_bins=None, name="UnbinRegressionOutput", **kwargs):
+        super().__init__(name=name, **kwargs)
+        self.scale = scale
+        self.n_bins = n_bins
+
+    def build(self, input_shape):
+        self.n_bins = input_shape[-1]
+        super().build(input_shape)
+
+    def call(self, inputs):
+        """
+        Unbins the regression output by applying the inverse of the scaling factor.
+        Args:
+            inputs (tf.Tensor): The binned regression output tensor of shape (batch_size, ..., n_bins).
+        Returns:
+            tf.Tensor: The unbinned regression output tensor of shape (batch_size, ...).
+        """
+        dtype = self.compute_dtype
+        scale = tf.cast(self.scale, dtype)
+        selected_bins = tf.cast(tf.argmax(inputs, axis=-1), inputs.dtype) / tf.cast(self.n_bins, inputs.dtype)
+        unbinned_output = (selected_bins - 0.5) * scale
+        return unbinned_output
+
+    def get_config(self):
+        config = super().get_config()
+        config.update({"scale": keras.saving.serialize_keras_object(self.scale)})
+        return config
+
+    @classmethod
+    def from_config(cls, config, custom_objects=None):
+        config = config.copy()
+        config["scale"] = keras.saving.deserialize_keras_object(
+            config["scale"], custom_objects=custom_objects
+        )
+        return cls(**config)
+
+    def bin_data(self, regression_data):
+        """
+        Bins the regression data by applying the scaling factor and converting to bin indices.
+        Args:
+            regression_data (tf.Tensor): The continuous regression data tensor of shape (batch_size, ...).
+        Returns:
+            tf.Tensor: The binned regression data tensor of shape (batch_size, ..., n_bins).
+        """
+        scaled_data = (regression_data / self.scale + 0.5) * self.n_bins
+        binned_data = tf.cast(
+            tf.clip_by_value(scaled_data, 0, self.n_bins - 1), tf.int32
+        )
+        one_hot_binned_data = tf.one_hot(binned_data, depth=self.n_bins)
+        return one_hot_binned_data

@@ -116,6 +116,40 @@ class RegressionDeviation(keras.metrics.Metric):
         config = super().get_config()
         config.update({"alpha": self.alpha})
         return config
+    
+class BinnedRegressionAccuracy(keras.metrics.Metric):
+    def __init__(self, name="binned_regression_accuracy", **kwargs):
+        super().__init__(name=name, **kwargs)
+        self.total = self.add_weight(name="total", initializer="zeros")
+        self.count = self.add_weight(name="count", initializer="zeros")
+
+    def update_state(self, y_true, y_pred, sample_weight=None):
+        y_true = tf.cast(y_true, tf.float32)
+        y_pred = tf.cast(y_pred, tf.float32)
+        # y_true and y_pred are expected to be of shape (batch_size, num_leptons, num_components , n_bins)
+        true_bins = tf.argmax(y_true, axis=-1)  # shape: (batch_size, num_leptons, num_components)
+        pred_bins = tf.argmax(y_pred, axis=-1)  # shape: (batch_size, num_leptons, num_components)
+
+        matches = tf.cast(tf.equal(true_bins, pred_bins), tf.bool)  # shape: (batch_size, num_leptons, num_components)
+        matches = tf.math.reduce_all(matches, axis=[1, 2])  # shape: (batch_size,)
+        matches = tf.cast(matches, self.dtype)  # shape: (batch_size,)
+
+        if sample_weight is not None:
+            sample_weight = tf.cast(sample_weight, self.dtype)
+            matches = matches * sample_weight
+        
+        self.total.assign_add(tf.reduce_sum(matches))
+        self.count.assign_add(tf.cast(tf.size(matches), self.dtype))
+
+    def result(self):
+        return self.total / self.count
+
+    def reset_states(self):
+        self.total.assign(0.0)
+        self.count.assign(0.0)
+
+    def get_config(self):
+        config = super().get_config()
 
 def _get_metric(metric_name):
     if metric_name not in globals():
