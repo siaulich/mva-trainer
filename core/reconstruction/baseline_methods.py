@@ -14,6 +14,7 @@ class BaselineAssigner(EventReconstructorBase):
         name = "baseline_assigner",
         mode="min",
         use_nu_flows=False,
+        manchester_style = False,
     ):
         super().__init__(
             config, assignment_name=name, full_reco_name= name + (r"+ $\nu^2$-Flows" if use_nu_flows else r" + True $\nu$"), perform_regression=False, use_nu_flows=use_nu_flows
@@ -33,6 +34,7 @@ class BaselineAssigner(EventReconstructorBase):
         self.jet_features = config.jet_features
         self.feature_index_dict = config.feature_indices
         self.b_tag_threshold = 2
+        self.manchester_style = manchester_style
 
     def compute_comparison_feature(self, data_dict):
         """
@@ -97,26 +99,29 @@ class BaselineAssigner(EventReconstructorBase):
                     b_tagged_jet_pt[more_than_2_b_tag_jet_mask]
                     >= second_leading_b_tagged_jet_pt
                 )
+            if self.manchester_style:
+                # For Manchester-style, if there are less than 2 b-tagged jets, keep all jets (including non-tagged) as viable
+                b_tag_mask[less_than_2_b_tag_jet_mask] = jet_mask[less_than_2_b_tag_jet_mask][:, :, 0]
+            else:
+                # For less than 2 b-tagged jets, fill up with leading non-tagged jets
+                iteration = 0
+                while less_than_2_b_tag_jet_mask.any():
+                    jet_pt_masked = jet_pt.copy()
+                    jet_pt_masked[b_tag_mask] = -1
 
-            # For less than 2 b-tagged jets, fill up with leading non-tagged jets
-            iteration = 0
-            while less_than_2_b_tag_jet_mask.any():
-                jet_pt_masked = jet_pt.copy()
-                jet_pt_masked[b_tag_mask] = -1
+                    leading_jet_pt_indices = np.argmax(jet_pt_masked, axis=1)
+                    leading_jet_pt_indices = leading_jet_pt_indices[:, np.newaxis]
 
-                leading_jet_pt_indices = np.argmax(jet_pt_masked, axis=1)
-                leading_jet_pt_indices = leading_jet_pt_indices[:, np.newaxis]
+                    update_mask = leading_jet_pt_indices[less_than_2_b_tag_jet_mask] == np.arange(self.max_jets)[np.newaxis, :]
+                    b_tag_mask[less_than_2_b_tag_jet_mask] |= update_mask
+                    less_than_2_b_tag_jet_mask = np.sum(b_tag_mask, axis=1) < 2
 
-                update_mask = leading_jet_pt_indices[less_than_2_b_tag_jet_mask] == np.arange(self.max_jets)[np.newaxis, :]
-                b_tag_mask[less_than_2_b_tag_jet_mask] |= update_mask
-                less_than_2_b_tag_jet_mask = np.sum(b_tag_mask, axis=1) < 2
-
-                iteration += 1
-                if iteration > self.max_jets:
-                    raise RuntimeError(
-                        "Exceeded maximum iterations while ensuring at least 2 b-tagged jets."
-                    )
-            jet_mask = jet_mask & b_tag_mask[:, :, np.newaxis]
+                    iteration += 1
+                    if iteration > self.max_jets:
+                        raise RuntimeError(
+                            "Exceeded maximum iterations while ensuring at least 2 b-tagged jets."
+                        )
+                jet_mask = jet_mask & b_tag_mask[:, :, np.newaxis]
         return jet_mask
 
     def predict_indices(self, data_dict):
@@ -154,20 +159,16 @@ class BaselineAssigner(EventReconstructorBase):
 class DeltaRAssigner(BaselineAssigner):
     def __init__(
         self,
-        config: DataConfig,
-        mode="min",
-        use_nu_flows=True,
         name=None,
+        **kwargs
     ):
         super().__init__(
-            config,
             name=(
                 name
                 if name is not None
                 else r"$\Delta R(\ell,j)$-Method"
             ),
-            mode=mode,
-            use_nu_flows=use_nu_flows,
+            **kwargs
         )
         """Initializes the DeltaRAssigner class.
         Args:

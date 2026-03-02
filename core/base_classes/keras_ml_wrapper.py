@@ -62,8 +62,6 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
         self.model: keras.models.Model = None
         self.trainable_model: keras.models.Model = None
         self.history = None
-        self.sample_weights = None
-        self.class_weights = None
         self.NUM_LEPTONS = config.NUM_LEPTONS
         self.max_jets = config.max_jets
         self.met_features = config.met_features
@@ -92,8 +90,6 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
     def prepare_training_data(
         self, X,y =None, sample_weights=None, class_weights=None, copy_data=False
     ):
-        self.sample_weights = sample_weights
-        self.class_weights = class_weights
         for input_name in self.inputs.keys():
             if input_name not in X:
                 raise ValueError(f"Input '{input_name}' not found in data dictionary.")
@@ -386,6 +382,7 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
         self.adapt_output_layer_scales(data)
     
     def adapt_output_layer_scales(self, data: dict):
+        print("No output layer scaling applied for this model.")
         pass
 
     def export_to_onnx(self, onnx_file_path="model.onnx"):
@@ -464,3 +461,6 @@ class KerasMLWrapper(BaseUtilityModel, ABC):
 
         print(f"ONNX model saved to {onnx_file_path}")
         return wrapped_model
+
+    def compute_sample_weights(self, X):
+        return utils.compute_sample_weights(X)

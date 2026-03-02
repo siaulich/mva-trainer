@@ -1,6 +1,6 @@
 import numpy as np
 
-def compute_sample_weights(X_train : dict, y_train, padding_value: float = -999) -> np.ndarray:
+def compute_sample_weights(X_train : dict, padding_value: float = -999) -> np.ndarray:
     """
     Compute sample weights based on the number of jets in each event.
     Events with more jets are given higher weights to balance the training.

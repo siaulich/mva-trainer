@@ -45,7 +45,8 @@ from ..utils import (
     project_vectors_onto_axis,
     lorentz_vector_from_PtEtaPhiE_array,
     lorentz_vector_from_neutrino_momenta_array,
-    scale_axis_tick_labels
+    scale_axis_tick_labels,
+    center_axis_ticks,
 )
 
 
@@ -1850,6 +1851,7 @@ class ReconstructionPlotter:
         feature_name: str = "pt",
         fancy_feature_label: Optional[str] = None,
         rescale_factor: Optional[float] = None,
+        center_bins: bool = False,
         accuracy_only = False,
         **kwargs,
     ):
@@ -1872,6 +1874,8 @@ class ReconstructionPlotter:
         )
         if rescale_factor is not None:
             scale_axis_tick_labels(ax, rescale_factor)
+        if center_bins:
+            center_axis_ticks(ax)
         if save_dir is not None:
             file_name = f"binned_accuracies_{feature_name}.pdf"
             file_path = os.path.join(save_dir, file_name)
@@ -1885,6 +1889,8 @@ class ReconstructionPlotter:
         )
         if rescale_factor is not None:
             scale_axis_tick_labels(ax, rescale_factor)
+        if center_bins:
+            center_axis_ticks(ax)
         if save_dir is not None:
             file_name = f"binned_accuracy_quotients_{feature_name}.pdf"
             file_path = os.path.join(save_dir, file_name)
@@ -1898,6 +1904,8 @@ class ReconstructionPlotter:
         )
         if rescale_factor is not None:
             scale_axis_tick_labels(ax, rescale_factor)
+        if center_bins:
+            center_axis_ticks(ax)
         if save_dir is not None:
             file_name = f"binned_selection_accuracies_{feature_name}.pdf"
             file_path = os.path.join(save_dir, file_name)
@@ -1918,6 +1926,8 @@ class ReconstructionPlotter:
             )
             if rescale_factor is not None:
                 scale_axis_tick_labels(ax, rescale_factor)
+            if center_bins:
+                center_axis_ticks(ax)
             if save_dir is not None:
                 file_name = f"binned_deviation_{variable_key}_{feature_name}.pdf"
                 file_path = os.path.join(save_dir, file_name)

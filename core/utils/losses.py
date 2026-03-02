@@ -163,9 +163,14 @@ class BinnedRegressionLoss(keras.losses.Loss):
         super().__init__(name=name, **kwargs)
 
     def call(self, y_true, y_pred, sample_weight=None):
-        # y_true: (batch, n_items, n_vars, n_bins)
+        # y_true: (batch, n_items, n_vars, 1) - bin indices
         # y_pred: (batch, n_items, n_vars, n_bins) - probabilities
+        n_bins = tf.shape(y_pred)[-1]
 
+        y_true = tf.one_hot(tf.cast(y_true,tf.int32), n_bins, dtype=tf.float32)
+        y_pred = tf.cast(y_pred, tf.float32)
+
+        # Cross entropy per item and var
         ce = -tf.reduce_sum(
             y_true * tf.math.log(y_pred + 1e-7), axis=-1
         )  # (batch, items, vars)

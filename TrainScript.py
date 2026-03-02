@@ -153,8 +153,9 @@ if __name__ == "__main__":
     train_options["callbacks"] = callbacks
 
     X_train, y_train, sample_weights = model.prepare_training_data(
-        X, y, copy_data=True, sample_weights=utils.compute_sample_weights(X, y)
+        X, y, sample_weights=model.compute_sample_weights(X)
     )
+    del X, y  # Free memory
 
     even_history = model.train_model(
         X_train,

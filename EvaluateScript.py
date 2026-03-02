@@ -31,6 +31,7 @@ class BinningVariableConfig:
     bins: Optional[int] = None
     xlims: Optional[Tuple[float, float]] = None
     rescale_factor: Optional[float] = None
+    center_bins: bool = False
 
 
 @dataclass
@@ -132,10 +133,17 @@ if __name__ == "__main__":
         ml_metrics_output_dir = os.path.join(args.output_dir or "./evaluation_results", "ml_metrics")
         os.makedirs(ml_metrics_output_dir, exist_ok=True)
         fig, ax = ml_evaluator.plot_training_history()
+        fig.savefig(os.path.join(ml_metrics_output_dir, "training_history.pdf"))
         print(f"Saved training history plot to {ml_metrics_output_dir}")
-        fig.savefig(os.path.join(ml_metrics_output_dir, "training_history.png"))
-        ml_evaluator.plot_feature_importance(save_dir=ml_metrics_output_dir)
-        print(f"Saved feature importance plots to {ml_metrics_output_dir}")
+
+        fig, ax = ml_evaluator.plot_model_parameters_comparison()
+        fig.savefig(os.path.join(ml_metrics_output_dir, "model_parameters_comparison.pdf"))
+        print(f"Saved model parameters comparison plot to {ml_metrics_output_dir}")
+
+        fig, ax = ml_evaluator.plot_inference_time_comparison()
+        fig.savefig(os.path.join(ml_metrics_output_dir, "inference_time_comparison.pdf"))
+        print(f"Saved inference time comparison plot to {ml_metrics_output_dir}")
+
         del ml_evaluator
     del ml_reconstructors
 

@@ -513,9 +513,9 @@ class MLEvaluator:
 
     def plot_inference_time_comparison(
         self,
-        num_samples: Optional[int] = None,
-        num_warmup: int = 10,
-        num_iterations: int = 100,
+        num_samples: Optional[int] = 100000,
+        num_warmup: int = 3,
+        num_iterations: int = 10,
         save_path: Optional[str] = None,
     ):
         """
@@ -535,8 +535,9 @@ class MLEvaluator:
             num_warmup=num_warmup,
             num_iterations=num_iterations,
         )
+        num_models = len(results)
 
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
+        fig, ax2 = plt.subplots(1, 1, figsize=(num_models * 5, 6))
 
         model_names = list(results.keys())
         mean_times = [results[name]["mean_time"] * 1000 for name in model_names]
@@ -544,15 +545,6 @@ class MLEvaluator:
         time_per_sample = [
             results[name]["time_per_sample"] * 1000 for name in model_names
         ]
-
-        # Plot 1: Total inference time
-        ax1.bar(model_names, mean_times, yerr=std_times, capsize=5, color="steelblue")
-        ax1.set_ylabel("Time (ms)")
-        ax1.set_title(
-            f"Total Inference Time ({results[model_names[0]]['num_samples']} samples)"
-        )
-        ax1.grid(True, alpha=0.3, axis="y")
-        ax1.tick_params(axis="x", rotation=45)
 
         # Plot 2: Time per sample
         ax2.bar(model_names, time_per_sample, color="coral")
@@ -567,7 +559,7 @@ class MLEvaluator:
             fig.savefig(save_path, dpi=300)
             print(f"\nInference time comparison plot saved to {save_path}")
 
-        return fig, (ax1, ax2)
+        return fig,  ax2
 
     def evaluate_model_parameters(self) -> dict:
         """
@@ -621,8 +613,9 @@ class MLEvaluator:
             Tuple of (fig, ax)
         """
         results = self.evaluate_model_parameters()
+        num_models = len(results)
+        fig, ax = plt.subplots(1, 1, figsize=(num_models * 3, 6))
 
-        fig, ax = plt.subplots(figsize=(10, 6))
 
         model_names = list(results.keys())
         trainable_params = [
@@ -657,9 +650,6 @@ class MLEvaluator:
         ax.set_xticklabels(model_names, rotation=45, ha="right")
         ax.legend()
         ax.grid(True, alpha=0.3, axis="y")
-
-        
-
         if save_path:
             fig.savefig(save_path, dpi=300)
             print(f"\nModel parameters comparison plot saved to {save_path}")
