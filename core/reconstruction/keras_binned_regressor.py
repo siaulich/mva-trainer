@@ -214,4 +214,4 @@ class KerasBinnedRegressor(EventReconstructorBase, KerasMLWrapper):
         sample_weights = np.prod(sample_weights, axis=tuple(range(1,sample_weights.ndim)))
         sample_weights = sample_weights / np.mean(sample_weights)  # Normalize to mean of 1
         sample_weights = (sample_weights)**alpha  # Apply scaling factor
-        return np.ones_like(sample_weights)
+        return sample_weights
